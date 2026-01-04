@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>🚍 Driver Live GPS</h2>
+
+<p id="status">Click start to share location</p>
+
+<button onclick="startTracking()">▶ Start Sharing Location</button>
+<button onclick="stopTracking()">⏹ Stop</button>
+
+<script>
+let watchId = null;
+
+function startTracking() {
+    if (!navigator.geolocation) {
+        alert("Geolocation not supported");
+        return;
+    }
+
+    document.getElementById("status").innerText = "📡 Sharing location...";
+
+    watchId = navigator.geolocation.watchPosition(
+        position => {
+            const data = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+            };
+
+            fetch("/update_location", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(data)
+            });
+        },
+        error => {
+            alert("GPS error: " + error.message);
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 5000
+        }
+    );
+}
+
+function stopTracking() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        document.getElementById("status").innerText = "⛔ Location sharing stopped";
+    }
+}
+</script>
+
+{% endblock %}

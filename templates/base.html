@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Smart College Bus{% endblock %}</title>
+
+    <!-- NAVBAR CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}">
+
+    <!-- GOOGLE ICONS -->
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
+</head>
+<body>
+
+    {% include 'navbar.html' %}
+
+    <div class="main-content">
+        {% block content %}{% endblock %}
+    </div>
+
+</body>
+</html>
+

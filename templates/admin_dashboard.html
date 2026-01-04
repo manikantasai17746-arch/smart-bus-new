@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 60px;
+            background: #f4f4f4;
+        }
+        h1 {
+            margin-bottom: 30px;
+        }
+        .nav {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 22px;
+            background: #333;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 16px;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+            transition: transform 0.2s, background 0.3s;
+        }
+        .btn:hover {
+            background: #555;
+            transform: scale(1.05);
+        }
+        @media (max-width: 600px) {
+            .btn {
+                font-size: 14px;
+                padding: 10px 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Admin Dashboard</h1>
+
+<div class="nav">
+    <a href="/admin/add_bus" class="btn" aria-label="Add a new bus">➕ Add Bus</a>
+    <a href="/admin/buses" class="btn" aria-label="View all buses">🚌 View Buses</a>
+    <a href="/admin/logout" class="btn" aria-label="Logout from admin dashboard">🚪 Logout</a>
+    <a href="{{ url_for('admin_complaints') }}" class="btn" aria-label="View student complaints">📢 View Student Complaints</a>
+    <a href="{{ url_for('admin_add_driver') }}" class="btn">👨‍✈️ Add Driver</a>
+
+</div>
+
+</body>
+</html>
+

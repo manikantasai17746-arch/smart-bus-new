@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Profile</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(#051f30, #000);
+            color: white;
+            min-height: 100vh;
+            font-family: Arial;
+        }
+        .main-content {
+            margin-left: 100px;
+            padding: 20px;
+        }
+        .card {
+            width: 400px;
+            margin: 60px auto;
+            background: #ffffff12;
+            backdrop-filter: blur(6px);
+            padding: 30px;
+            border-radius: 18px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            border: none;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #0c0c0c;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+{% include "navbar.html" %}
+
+<div class="main-content">
+    <div class="card">
+        <h2>Edit Profile</h2>
+
+        <form method="POST" enctype="multipart/form-data">
+            <input type="text" name="username" value="{{ user['username'] }}" required>
+            <input type="email" name="email" value="{{ user['email'] }}" required>
+
+            <input type="password" name="old_password" placeholder="Old Password" required>
+            <input type="password" name="new_password" placeholder="New Password" required>
+
+            <input type="file" name="photo">
+
+            <button type="submit">Save Changes</button>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

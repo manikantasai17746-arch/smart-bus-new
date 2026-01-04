@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Student Complaints</title>
+    <style>
+        body {
+            background:#0f2027;
+            color:white;
+            font-family: Arial, sans-serif;
+            padding:20px;
+        }
+        .card {
+            background:#1e293b;
+            padding:15px;
+            border-radius:10px;
+            margin-bottom:15px;
+        }
+        .subject {
+            font-size:18px;
+            color:#38bdf8;
+            font-weight:bold;
+        }
+        .meta {
+            font-size:13px;
+            color:#cbd5e1;
+        }
+        .message {
+            margin-top:10px;
+            background:#020617;
+            padding:10px;
+            border-radius:8px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>📢 Student Complaints</h2>
+
+{% if complaints %}
+    {% for c in complaints %}
+        <div class="card">
+            <div class="subject">{{ c.subject }}</div>
+            <div class="meta">
+                👤 {{ c.username }} | 📧 {{ c.email }} <br>
+                🕒 {{ c.created_at }}
+            </div>
+            <div class="message">
+                {{ c.message }}
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <p>No complaints submitted yet.</p>
+{% endif %}
+
+<a href="{{ url_for('admin_dashboard') }}" style="color:#38bdf8;">⬅ Back to Dashboard</a>
+
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Buses</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #333; padding: 10px; text-align: center; }
+        th { background: #333; color: white; }
+        a.delete { color: red; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+<h2>Bus List</h2>
+
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Bus Number</th>
+        <th>Registration Number</th>
+        <th>Driver Name</th>
+        <th>Route</th>
+        <th>Action</th>
+    </tr>
+
+    {% for bus in buses %}
+    <tr>
+        <td>{{ bus.id }}</td>
+        <td>{{ bus.bus_number }}</td>
+        <td>{{ bus.registration_number }}</td>
+        <td>{{ bus.driver_name }}</td>
+        <td>{{ bus.route }}</td>
+        <td>
+            <a class="delete"
+               href="/admin/delete_bus/{{ bus.id }}"
+               onclick="return confirm('Are you sure you want to delete this bus?');">
+               ❌ Delete
+            </a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br>
+<a href="/admin/dashboard">⬅ Back to Dashboard</a>
+
+</body>
+</html>

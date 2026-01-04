@@ -1,0 +1,93 @@
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+
+<div class="menu">
+    <ul class="menu-content">
+
+        <!-- USER NAME (DISPLAY ONLY – NO LINK) -->
+        <li class="user-item">
+            <a href="javascript:void(0)">
+                <span class="material-symbols-outlined">person</span>
+                <span>{{ session.get('username', 'User') }}</span>
+            </a>
+        </li>
+
+        <!-- HOME -->
+        <li class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+            <a href="{{ url_for('dashboard') }}">
+                <span class="material-symbols-outlined">home</span>
+                <span>Home</span>
+            </a>
+        </li>
+
+        <!-- MY BUS -->
+        <li class="{% if request.endpoint == 'my_bus' %}active{% endif %}">
+            <a href="{{ url_for('my_bus') }}">
+                <span class="material-symbols-outlined">directions_bus</span>
+                <span>My Bus</span>
+            </a>
+        </li>
+
+        <!-- 🧑‍✈️ DRIVER GPS (NEW LINK) -->
+        {% if session.get("role") == "driver" %}
+        <li>
+          <a href="{{ url_for('driver_gps') }}">
+            <span class="material-symbols-outlined">location_on</span>
+            <span>Driver GPS</span>
+          </a>
+        </li>
+        {% endif %}
+
+        
+
+
+        <!-- ACCOUNT (EDIT PROFILE HERE) -->
+        <li class="{% if request.endpoint == 'profile' %}active{% endif %}">
+            <a href="{{ url_for('profile') }}">
+                <span class="material-symbols-outlined">account_circle</span>
+                <span>Account</span>
+            </a>
+        </li>
+
+        <!-- REPORT -->
+       <!-- REPORT -->
+        <li class="{% if request.endpoint == 'report' %}active{% endif %}">
+             <a href="{{ url_for('report') }}">
+        <span class="material-symbols-outlined">report_problem</span>
+        <span>Report</span>
+             </a>
+        </li>
+
+
+        <!-- EMAIL ADMIN -->
+<li>
+    <a href="mailto:transport@college.edu
+        ?subject=Bus%20Issue%20Report
+        &body=Hello%20Admin,%0A%0A
+        User:%20{{ session.get('username') }}%0A
+        Please%20describe%20the%20issue%20below:%0A">
+        
+        <span class="material-symbols-outlined">mail</span>
+        <span>Email</span>
+    </a>
+</li>
+
+        <!-- LOGOUT -->
+        <li class="logout-item">
+            <a href="{{ url_for('logout') }}">
+            
+
+                <span class="material-symbols-outlined">logout</span>
+                <span>Logout</span>
+            </a>
+        </li>
+
+        <!-- ADMIN LOGIN -->
+        <li class="admin-item">
+            <a href="{{ url_for('admin_login') }}">
+                <span class="material-symbols-outlined">admin_panel_settings</span>
+                <span>Admin Login</span>
+            </a>
+        </li>
+
+    </ul>
+</div>

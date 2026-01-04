@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Bus</title>
+</head>
+<body>
+
+<h2>Add Bus</h2>
+
+<form method="POST">
+    <input name="bus_number" placeholder="Bus Number" required><br><br>
+    <input name="registration_number" placeholder="Registration Number" required><br><br>
+    <input name="driver_name" placeholder="Driver Name" required><br><br>
+    <input name="route" placeholder="Route" required><br><br>
+
+    <!-- OPTIONAL USER -->
+    <select name="user_id">
+        <option value="">-- Not Assigned --</option>
+        {% for user in users %}
+            <option value="{{ user.id }}">{{ user.username }}</option>
+        {% endfor %}
+    </select><br><br>
+
+    <button type="submit">Add Bus</button>
+</form>
+
+<br>
+<a href="{{ url_for('admin_dashboard') }}">⬅ Back</a>
+
+</body>
+</html>
+

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title> / Contact Admin</title>
+
+    <!-- ✅ REQUIRED FOR NAVBAR ICONS -->
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+
+    <!-- Sidebar / Menu CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}">
+
+    <style>
+        .report-container {
+            margin-left: 120px;
+            padding: 30px;
+            color: white;
+        }
+
+        .report-card {
+            background: rgba(0,0,0,0.35);
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 700px;
+        }
+
+        .report-card h2 {
+            color: #4fc3f7;
+            margin-bottom: 20px;
+        }
+
+        .admin-info p {
+            margin: 6px 0;
+        }
+
+        .contact-box {
+            background: rgba(255,255,255,0.08);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            border-radius: 10px;
+            padding: 10px;
+            border: none;
+            outline: none;
+            margin-top: 10px;
+        }
+
+        button {
+            margin-top: 15px;
+            background: #29b6f6;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0288d1;
+        }
+    </style>
+</head>
+
+<body>
+    
+
+{% include "navbar.html" %}
+
+<div class="report-container">
+    <div class="report-card">
+
+        <h2>📢 Report Issue / Contact Admin</h2>
+
+        {% if admin %}
+        <div class="admin-info">
+            <p><b>Office:</b> ADITYA UNIVERSITY </p>
+            <p><b>Admin Name:</b> { MANIKANTA}</p>
+            <p><b>Email:</b> manikantasai218@gmail.com </p>
+        </div>
+
+        <h3 style="margin-top:20px;">📞 Contact Numbers</h3>
+
+        {% for c in contacts %}
+        <div class="contact-box">
+            {{ c.phone }}
+        </div>
+        {% endfor %}
+
+        <h3 style="margin-top:25px;">📝 Report an Issue</h3>
+
+        <form action="{{ url_for('submit_complaint') }}" method="post">
+
+    <input
+        type="text"
+        name="subject"
+        placeholder="Complaint Subject"
+        required
+        style="width:100%; padding:10px; border-radius:8px;"
+    >
+
+    <br><br>
+
+    <textarea
+        name="message"
+        placeholder="Describe your issue..."
+        required
+        style="width:100%; height:120px; border-radius:10px; padding:10px;"
+    ></textarea>
+
+    <br><br>
+
+    <button type="submit" class="btn btn-primary">
+        🚨 Submit Complaint
+    </button>
+</form>
+
+                      
+
+        {% else %}
+        <p>❌ Admin information not available</p>
+        {% endif %}
+
+    </div>
+</div>
+
+</body>
+</html>

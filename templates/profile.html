@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Account</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+
+<style>
+body {
+    background: linear-gradient(#051f30, #000);
+    color: white;
+}
+.main-content {
+    margin-left: 100px;
+    padding: 30px;
+}
+.card {
+    width: 400px;
+    background: #ffffff12;
+    backdrop-filter: blur(6px);
+    padding: 25px;
+    border-radius: 18px;
+    margin: auto;
+}
+.card img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: block;
+    margin: auto;
+}
+input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 10px;
+    border: none;
+}
+button {
+    width: 100%;
+    margin-top: 15px;
+    padding: 10px;
+    background: #0c0c0c;
+    color: white;
+    border-radius: 20px;
+    border: none;
+}
+</style>
+</head>
+
+<body>
+
+{% include "navbar.html" %}
+
+<div class="main-content">
+<div class="card">
+
+<img src="{{ url_for('static', filename='uploads/' + user['photo']) }}">
+
+<form method="POST" enctype="multipart/form-data">
+
+<input type="text" name="username" value="{{ user['username'] }}" required>
+<input type="email" name="email" value="{{ user['email'] }}" required>
+
+<input type="password" name="current_password" placeholder="Current Password" required>
+<input type="password" name="new_password" placeholder="New Password (optional)">
+
+<input type="file" name="photo">
+
+<button type="submit">Update Profile</button>
+
+</form>
+
+</div>
+</div>
+
+</body>
+</html>
