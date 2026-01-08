@@ -3,43 +3,36 @@
 <head>
     <title>My Bus – Live Tracking</title>
 
-    <!-- Dashboard / Menu CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}">
-
-    <!-- Leaflet CSS -->
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
     <style>
         .main-content {
             padding: 30px;
             color: white;
         }
-
         #map {
+            height: 500px;
             width: 100%;
-            height: 400px;
-            border-radius: 10px;
             margin-top: 15px;
+            border-radius: 10px;
+        }
+        #etaBox {
+            margin-top: 10px;
+            font-size: 16px;
+            color: #00ffcc;
+            font-weight: bold;
         }
     </style>
 </head>
 
 <body>
-    {% if session.get("role") == "student" %}
-<a href="{{ url_for('set_pickup') }}" class="pickup-fixed">
-  📍 Set Pickup / Update Pickup
-</a>
-{% endif %}
-
-
 {% include "navbar.html" %}
 
-<!-- ✅ SAME WRAPPER AS DASHBOARD -->
 <div class="main-content">
-
     <h2>🚍 My Bus (Live Tracking)</h2>
 
     {% if bus %}
@@ -48,84 +41,229 @@
         <p><b>Driver:</b> {{ bus.driver_name }}</p>
         <p><b>Route:</b> {{ bus.route }}</p>
 
+        <div id="etaBox">⏱ ETA: <span id="eta">--</span></div>
+        <p>⏱ ETA to Pickup: <b><span id="pickupEta">--</span></b></p>
+
+
         <div id="map"></div>
 
+        <p id="distanceText"
+           style="margin-top:10px;color:yellow;font-weight:bold;">
+        </p>
+
     {% else %}
-        <p>❌ No bus assigned to you</p>
+        <p style="color:red;">❌ No bus assigned to you</p>
+
+        {% if session.get("role") == "student" %}
+        <form method="POST" style="margin-top:15px;">
+            <label>Enter Bus Number</label><br><br>
+            <input type="text" name="bus_number" required>
+            <br><br>
+            <button type="submit">Assign My Bus</button>
+        </form>
+        {% endif %}
     {% endif %}
-
 </div>
-{% if session.get("role") == "student" %}
 
-  {% if pickup is none %}
-    <!-- First time -->
-    <a href="{{ url_for('set_pickup') }}" class="btn btn-primary">
-      📍 Set Pickup Point
-    </a>
-  {% else %}
-    <!-- Already set -->
-    <a href="{{ url_for('set_pickup') }}" class="btn btn-warning">
-      🔁 Update Pickup Point
-    </a>
-  {% endif %}
-
-{% endif %}
-
-
-
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-let map;
-let marker;
+/* ================= MAP ================= */
+let map = L.map('map').setView([17.089148, 82.06599], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// ✅ INIT MAP
-function initMap() {
-    const defaultLat = 17.3850;
-    const defaultLng = 78.4867;
+/* ================= ICONS ================= */
+let pickupIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
 
-    map = L.map('map').setView([defaultLat, defaultLng], 15);
+/* ================= MARKERS ================= */
+let driverMarker = L.marker([0,0]).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
+let destinationLat = 17.089148;
+let destinationLng = 82.06599;
+L.marker([destinationLat, destinationLng], { icon: pickupIcon })
+    .addTo(map)
+    .bindPopup("🎓 College");
 
-    marker = L.marker([defaultLat, defaultLng])
-        .addTo(map)
-        .bindPopup("Bus Location");
+let pickupMarkers = [];
+let routeControl = null;
+let lastRouteLat = null;
+let lastRouteLng = null;
 
-    startLiveTracking();
-}
+/* ====== PICKUP ALERT VARIABLES ====== */
+let myPickup = null;
+let pickupAlertShown = false;
 
-// ✅ AUTO REFRESH GPS
-function startLiveTracking() {
-    setInterval(fetchBusLocation, 5000);
-}
-
-// ✅ FETCH FROM BACKEND
-function fetchBusLocation() {
-    fetch("/bus_location/{{ bus.id }}")
-        .then(response => response.json())
+/* ================= LOAD DRIVER LOCATION ================= */
+function loadLocation() {
+    fetch("/student/get_location")
+        .then(res => res.json())
         .then(data => {
-            if (data.latitude !== undefined && data.longitude !== undefined) {
-                const lat = data.latitude;
-                const lng = data.longitude;
+            if (!data.latitude || !data.longitude) return;
 
-                marker.setLatLng([lat, lng]);
-                map.panTo([lat, lng]);
+            driverMarker.setLatLng([data.latitude, data.longitude]);
+            map.setView([data.latitude, data.longitude], 15, { animate: true });
+            loadPickupETA(data.latitude, data.longitude);
+
+
+            if (
+                lastRouteLat === null ||
+                Math.abs(data.latitude - lastRouteLat) > 0.003 ||
+                Math.abs(data.longitude - lastRouteLng) > 0.003
+            ) {
+                drawRoute(data.latitude, data.longitude);
+                lastRouteLat = data.latitude;
+                lastRouteLng = data.longitude;
             }
-        })
-        .catch(err => console.log("GPS error:", err));
+
+            // 🚨 PICKUP ARRIVAL ALERT (ONE TIME)
+            if (myPickup && !pickupAlertShown) {
+                const d = distanceMeters(
+                    data.latitude,
+                    data.longitude,
+                    myPickup.lat,
+                    myPickup.lng
+                );
+
+                if (d <= 400) {
+                    alert("🚌 Bus is near your pickup point");
+                    pickupAlertShown = true;
+                }
+            }
+        });
 }
 
-    initMap();
-   </script>
+/* ================= LOAD BUS PICKUPS ================= */
+function loadPickups() {
+    fetch("/student/get_bus_pickups")
+        .then(res => res.json())
+        .then(points => {
+            pickupMarkers.forEach(m => map.removeLayer(m));
+            pickupMarkers = [];
 
-    <a href="{{ url_for('assign_bus', bus_id=bus.id) }}"
-   class="assign-btn">
-   🚌 Assign This Bus
-   </a>
+            points.forEach(p => {
+                let m = L.marker([p.lat, p.lng], { icon: pickupIcon })
+                    .addTo(map)
+                    .bindPopup("📍 " + p.name);
+                pickupMarkers.push(m);
+            });
+        });
+
+    // 🔹 LOAD THIS STUDENT'S PICKUP
+    fetch("/student/get_pickup")
+        .then(res => res.json())
+        .then(p => {
+            if (p.latitude && p.longitude) {
+                myPickup = {
+                    lat: p.latitude,
+                    lng: p.longitude
+                };
+            }
+        });
+}
+
+/* ================= ROUTE + DISTANCE ================= */
+function drawRoute(lat, lng) {
+    fetch("/student/get_bus_pickups")
+        .then(res => res.json())
+        .then(points => {
+
+            if (points.length === 0) return;
+
+            let waypoints = [
+                L.latLng(lat, lng),
+                ...points.map(p => L.latLng(p.lat, p.lng)),
+                L.latLng(destinationLat, destinationLng)
+            ];
+
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
+
+            routeControl = L.Routing.control({
+                waypoints: waypoints,
+                addWaypoints: false,
+                draggableWaypoints: false,
+                show: false,
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1'
+                })
+            })
+            .on('routesfound', function(e) {
+                const km =
+                    (e.routes[0].summary.totalDistance / 1000).toFixed(2);
+                document.getElementById("distanceText").innerText =
+                    "Distance to college: " + km + " km";
+            })
+            .addTo(map);
+        });
+}
+
+/* ================= DISTANCE FUNCTION ================= */
+function distanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+
+    const a =
+        Math.sin(dLat/2)**2 +
+        Math.cos(lat1*Math.PI/180) *
+        Math.cos(lat2*Math.PI/180) *
+        Math.sin(dLon/2)**2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* ================= ETA ================= */
+function loadETA() {
+    fetch("/student/get_eta")
+        .then(res => res.json())
+        .then(data => {
+            if (data.eta !== undefined) {
+                document.getElementById("eta").innerText =
+                    data.eta + " min";
+            }
+        });
+}
+
+/* ================= LOOP ================= */
+loadLocation();
+loadPickups();
+loadETA();
+
+setInterval(loadLocation, 5000);
+setInterval(loadETA, 5000);
+setInterval(loadPickups, 15000);
+
+function loadPickupETA(driverLat, driverLng) {
+    if (!myPickup) return;
+
+    L.Routing.osrmv1({
+        serviceUrl: "https://router.project-osrm.org/route/v1"
+    }).route(
+        [
+            L.latLng(driverLat, driverLng),
+            L.latLng(myPickup.lat, myPickup.lng)
+        ],
+        (err, routes) => {
+            if (err || !routes || !routes.length) return;
+
+            const minutes = Math.ceil(
+                routes[0].summary.totalTime / 60
+            );
+
+            document.getElementById("pickupEta").innerText =
+                minutes + " min";
+        }
+    );
+}
+
+</script>
 
 </body>
 </html>

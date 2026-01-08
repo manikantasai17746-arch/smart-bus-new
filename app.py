@@ -21,12 +21,15 @@ def init_db():
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            photo TEXT DEFAULT 'user.png'
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         username TEXT UNIQUE NOT NULL,
+         email TEXT UNIQUE NOT NULL,
+         password TEXT NOT NULL,
+         role TEXT NOT NULL DEFAULT 'student',
+         bus_id INTEGER,
+         photo TEXT DEFAULT 'user.png'
         )
+
     """)
     # ================= STUDENT COMPLAINTS =================
     conn.execute("""
@@ -102,11 +105,12 @@ def init_db():
     conn.execute("""
         INSERT OR IGNORE INTO admin_contacts (id, admin_id, phone)
         VALUES
-        (1, 1, '+91-9876543210'),
-        (2, 1, '+91-9123456780'),
+        (1, 1, '+91-7981345991'),
+        (2, 1, '+91-8919226940'),
         (3, 1, '+91-9000000000')
     """)
 
+    
     conn.commit()
     conn.close()
 
@@ -185,16 +189,20 @@ def dashboard():
     return render_template("dashboard.html")
 
 
-@app.route("/my_bus")
+@app.route("/my_bus", methods=["GET", "POST"])
 def my_bus():
+
     if "user_id" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("index"))
+
+    user_id = session["user_id"]
 
     conn = get_db_connection()
 
+    # --- get user bus ---
     user = conn.execute(
         "SELECT bus_id FROM users WHERE id = ?",
-        (session["user_id"],)
+        (user_id,)
     ).fetchone()
 
     bus = None
@@ -204,83 +212,109 @@ def my_bus():
             (user["bus_id"],)
         ).fetchone()
 
-    buses = conn.execute("SELECT * FROM buses").fetchall()
+    # --- get pickup ---
+    pickup = conn.execute(
+        "SELECT * FROM pickup_points WHERE user_id = ?",
+        (user_id,)
+    ).fetchone()
 
+    # --- handle POST ---
+    if request.method == "POST":
+        bus_number = request.form.get("bus_number")
+
+        bus_row = conn.execute(
+            "SELECT id FROM buses WHERE bus_number = ?",
+            (bus_number,)
+        ).fetchone()
+
+        if bus_row:
+            conn.execute(
+                "UPDATE users SET bus_id = ? WHERE id = ?",
+                (bus_row["id"], user_id)
+            )
+            conn.commit()
+            flash("Bus assigned successfully")
+        else:
+            flash("Invalid bus number")
+
+        conn.close()
+        return redirect(url_for("my_bus"))
+
+    # --- close DB ONCE ---
     conn.close()
 
     return render_template(
         "my_bus.html",
         bus=bus,
-        buses=buses
+        pickup=pickup
     )
+
+
 
 
 # ================= DRIVER GPS PAGE (✅ ADDED) =================
 @app.route("/driver_gps")
 def driver_gps():
 
-    if "user_id" not in session:
-        return redirect(url_for("index"))
-
-    # 🔒 Allow ONLY drivers
     if session.get("role") != "driver":
-        flash("❌ Access denied: Drivers only")
         return redirect(url_for("dashboard"))
 
     conn = get_db_connection()
 
-    driver = conn.execute("""
+    bus = conn.execute("""
         SELECT buses.*
-        FROM drivers
-        JOIN buses ON drivers.bus_id = buses.id
-        WHERE drivers.user_id = ?
+        FROM users
+        JOIN buses ON users.bus_id = buses.id
+        WHERE users.id = ?
     """, (session["user_id"],)).fetchone()
 
     conn.close()
 
-    if not driver:
-        flash("❌ No bus assigned to you")
+    if not bus:
+        flash("❌ No bus assigned")
         return redirect(url_for("dashboard"))
 
-    return render_template("driver_gps.html", bus=driver)
+    return render_template("driver_gps.html", bus=bus)
+
+
 
 
 
 # ================= GPS UPDATE (DRIVER) =================
-@app.route("/update_location", methods=["POST"])
-def update_location():
+@app.route("/driver/update_location", methods=["POST"])
+def driver_update_location():
 
-    if "user_id" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
+    if "user_id" not in session or session.get("role") != "driver":
+        return jsonify({"error": "unauthorized"}), 403
 
-    # 🔒 Only drivers can send GPS
-    if session.get("role") != "driver":
-        return jsonify({"error": "Drivers only"}), 403
+    data = request.json
+    lat = data.get("latitude")
+    lng = data.get("longitude")
 
-    data = request.get_json()
-    latitude = data.get("latitude")
-    longitude = data.get("longitude")
+    if not lat or not lng:
+        return jsonify({"error": "invalid data"}), 400
 
     conn = get_db_connection()
 
-    driver = conn.execute(
-        "SELECT bus_id FROM drivers WHERE user_id=?",
-        (session["user_id"],)
-    ).fetchone()
+    # get driver's bus
+    bus = conn.execute("""
+        SELECT bus_id FROM users WHERE id = ?
+    """, (session["user_id"],)).fetchone()
 
-    if not driver:
+    if not bus or not bus["bus_id"]:
         conn.close()
-        return jsonify({"error": "No bus assigned"}), 403
+        return jsonify({"error": "no bus assigned"}), 400
 
     conn.execute("""
-        INSERT INTO bus_location (bus_id, latitude, longitude)
-        VALUES (?, ?, ?)
-    """, (driver["bus_id"], latitude, longitude))
+        INSERT INTO driver_location (driver_id, bus_id, latitude, longitude)
+        VALUES (?, ?, ?, ?)
+    """, (session["user_id"], bus["bus_id"], lat, lng))
 
     conn.commit()
     conn.close()
 
-    return jsonify({"status": "Location updated"})
+    return jsonify({"status": "ok"})
+
 
 
 
@@ -394,7 +428,36 @@ def admin_dashboard():
     if "user_id" not in session or session.get("role") != "admin":
         return redirect(url_for("admin_login"))
 
-    return render_template("admin_dashboard.html")
+    # ✅ ADD THIS PART
+    conn = get_db_connection()
+
+    total_students = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE role = 'student'"
+    ).fetchone()[0]
+
+    total_drivers = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE role = 'driver'"
+    ).fetchone()[0]
+
+    total_buses = conn.execute(
+        "SELECT COUNT(*) FROM buses"
+    ).fetchone()[0]
+
+    active_tracking = conn.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM active_students"
+    ).fetchone()[0]
+
+    conn.close()
+
+    # ✅ PASS DATA TO TEMPLATE
+    return render_template(
+        "admin_dashboard.html",
+        total_students=total_students,
+        total_drivers=total_drivers,
+        total_buses=total_buses,
+        active_tracking=active_tracking
+    )
+
 
 
 
@@ -468,14 +531,11 @@ def admin_logout():
 @app.route("/admin/add_driver", methods=["GET", "POST"])
 def admin_add_driver():
 
-    # 🔒 Admin protection
     if "user_id" not in session or session.get("role") != "admin":
         flash("❌ Admin access only")
         return redirect(url_for("admin_dashboard"))
 
-
     conn = get_db_connection()
-
     buses = conn.execute("SELECT * FROM buses").fetchall()
 
     if request.method == "POST":
@@ -484,18 +544,29 @@ def admin_add_driver():
         password = request.form["password"]
         bus_id = request.form["bus_id"]
 
-        # 1️⃣ Create user as driver
+        # ❗ check duplicate
+        existing = conn.execute(
+            "SELECT id FROM users WHERE username=?",
+            (username,)
+        ).fetchone()
+
+        if existing:
+            conn.close()
+            flash("❌ Username already exists")
+            return redirect(url_for("admin_add_driver"))
+
+        # 1️⃣ create driver user
         conn.execute("""
-            INSERT INTO users (username, email, password, role)
-            VALUES (?, ?, ?, 'driver')
-        """, (username, email, password))
+            INSERT INTO users (username, email, password, role, bus_id)
+            VALUES (?, ?, ?, 'driver', ?)
+        """, (username, email, password, bus_id))
 
         driver_user_id = conn.execute(
             "SELECT id FROM users WHERE username=?",
             (username,)
-        ).fetchone()[0]
+        ).fetchone()["id"]
 
-        # 2️⃣ Assign bus to driver
+        # 2️⃣ map driver to bus
         conn.execute("""
             INSERT INTO drivers (user_id, bus_id)
             VALUES (?, ?)
@@ -504,11 +575,14 @@ def admin_add_driver():
         conn.commit()
         conn.close()
 
-        flash("✅ Driver created and bus assigned")
-        return redirect(url_for("admin"))
+        flash("✅ Driver created successfully")
+        return redirect(url_for("admin_dashboard"))
 
     conn.close()
     return render_template("admin_add_driver.html", buses=buses)
+
+
+    
 
 # ================= REPORT PAGE =================
 @app.route("/report")
@@ -577,14 +651,31 @@ def admin_complaints():
 #===================FLASK ROUTE (BACKEND)=======================================
 @app.route("/student/set_pickup", methods=["GET", "POST"])
 def set_pickup():
+
+    # 🔒 Only students
     if "user_id" not in session or session.get("role") != "student":
         return redirect(url_for("index"))
 
+    user_id = session["user_id"]
     conn = get_db_connection()
 
+    # 🔍 Get student's assigned bus
+    student = conn.execute(
+        "SELECT bus_id FROM users WHERE id = ?",
+        (user_id,)
+    ).fetchone()
+
+    if not student or not student["bus_id"]:
+        conn.close()
+        flash("❌ Please assign a bus before setting pickup point")
+        return redirect(url_for("my_bus"))
+
+    bus_id = student["bus_id"]
+
+    # 🔍 Existing pickup (if any)
     existing = conn.execute(
-        "SELECT * FROM pickup_points WHERE user_id=?",
-        (session["user_id"],)
+        "SELECT * FROM pickup_points WHERE user_id = ?",
+        (user_id,)
     ).fetchone()
 
     if request.method == "POST":
@@ -595,23 +686,25 @@ def set_pickup():
         if existing:
             conn.execute("""
                 UPDATE pickup_points
-                SET pickup_name=?, latitude=?, longitude=?
-                WHERE user_id=?
-            """, (pickup_name, lat, lng, session["user_id"]))
+                SET pickup_name = ?, latitude = ?, longitude = ?, bus_id = ?
+                WHERE user_id = ?
+            """, (pickup_name, lat, lng, bus_id, user_id))
         else:
             conn.execute("""
-                INSERT INTO pickup_points (user_id, pickup_name, latitude, longitude)
-                VALUES (?, ?, ?, ?)
-            """, (session["user_id"], pickup_name, lat, lng))
+                INSERT INTO pickup_points
+                (user_id, bus_id, pickup_name, latitude, longitude)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, bus_id, pickup_name, lat, lng))
 
         conn.commit()
         conn.close()
 
         flash("✅ Pickup point saved successfully")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("my_bus"))
 
     conn.close()
     return render_template("set_pickup.html")
+
 
 
 
@@ -638,9 +731,263 @@ def assign_bus(bus_id):
 
 
 
+@app.route("/driver/update_location", methods=["POST"])
+def update_driver_location():
+    if session.get("role") != "driver":
+        return "Unauthorized", 403
 
-# ================= RUN =================
+    lat = request.form.get("lat")
+    lng = request.form.get("lng")
+    driver_id = session["user_id"]
+
+    conn = get_db_connection()
+
+    conn.execute("""
+        INSERT INTO driver_location (driver_id, latitude, longitude)
+        VALUES (?, ?, ?)
+        ON CONFLICT(driver_id) DO UPDATE SET
+        latitude=excluded.latitude,
+        longitude=excluded.longitude,
+        updated_at=CURRENT_TIMESTAMP
+    """, (driver_id, lat, lng))
+
+    conn.commit()
+    conn.close()
+
+    return "OK"
+
+@app.route("/student/get_location")
+def student_get_location():
+
+    if "user_id" not in session:
+        return jsonify({})
+
+    conn = get_db_connection()
+
+    user = conn.execute(
+        "SELECT bus_id FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    if not user or not user["bus_id"]:
+        conn.close()
+        return jsonify({})
+
+    loc = conn.execute("""
+        SELECT latitude, longitude
+        FROM bus_location
+        WHERE bus_id = ?
+        ORDER BY updated_at DESC
+        LIMIT 1
+    """, (user["bus_id"],)).fetchone()
+
+    conn.close()
+
+    if loc:
+        return jsonify({
+            "latitude": loc["latitude"],
+            "longitude": loc["longitude"]
+        })
+
+    return jsonify({})
+
+
+
+
+
+
+
+@app.route("/route_data/<int:bus_id>")
+def route_data(bus_id):
+    conn = get_db_connection()
+
+    # get active students of THIS bus
+    pickups = conn.execute("""
+        SELECT p.latitude, p.longitude, u.username
+        FROM pickup_points p
+        JOIN users u ON u.id = p.user_id
+        JOIN active_students a ON a.user_id = p.user_id
+        WHERE a.bus_id = ?
+    """, (bus_id,)).fetchall()
+
+
+    conn.close()
+
+    return {
+        "pickups": [
+                 {
+                "lat": r["latitude"],
+                "lng": r["longitude"],
+                "name": r["username"]
+             }
+             for r in pickups
+         ],
+         "destination": {
+              "lat": 17.089148,
+              "lng": 82.06599
+         }
+    }
+
+
+
+
+
+
+
+
+@app.route("/student/get_pickup")
+def student_get_pickup():
+
+    if "user_id" not in session:
+        return jsonify({})
+
+    conn = get_db_connection()
+
+    pickup = conn.execute("""
+        SELECT latitude, longitude
+        FROM pickup_points
+        WHERE user_id = ?
+    """, (session["user_id"],)).fetchone()
+
+    conn.close()
+
+    if pickup:
+        return jsonify({
+            "latitude": pickup["latitude"],
+            "longitude": pickup["longitude"]
+        })
+
+    return jsonify({})
+
+@app.route("/driver/get_pickups")
+def driver_get_pickups():
+
+    if session.get("role") != "driver":
+        return jsonify([])
+
+    conn = get_db_connection()
+
+    bus = conn.execute(
+        "SELECT bus_id FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    if not bus or not bus["bus_id"]:
+        conn.close()
+        return jsonify([])
+
+    pickups = conn.execute("""
+        SELECT latitude, longitude, pickup_name
+        FROM pickup_points
+        WHERE bus_id = ?
+    """, (bus["bus_id"],)).fetchall()
+
+    conn.close()
+
+    return jsonify([
+        {
+            "lat": p["latitude"],
+            "lng": p["longitude"],
+            "name": p["pickup_name"]
+        } for p in pickups
+    ])
+
+@app.route("/driver/update_eta", methods=["POST"])
+def driver_update_eta():
+
+    if session.get("role") != "driver":
+        return jsonify({"error": "unauthorized"}), 403
+
+    data = request.json
+    eta = data.get("eta")
+
+    conn = get_db_connection()
+
+    bus = conn.execute(
+        "SELECT bus_id FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    if not bus or not bus["bus_id"]:
+        conn.close()
+        return jsonify({"error": "no bus"}), 400
+
+    conn.execute("""
+        INSERT INTO bus_status (bus_id, eta)
+        VALUES (?, ?)
+        ON CONFLICT(bus_id) DO UPDATE SET
+            eta = excluded.eta,
+            updated_at = CURRENT_TIMESTAMP
+    """, (bus["bus_id"], eta))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "ok"})
+
+@app.route("/student/get_eta")
+def student_get_eta():
+
+    if "user_id" not in session:
+        return jsonify({})
+
+    conn = get_db_connection()
+
+    bus = conn.execute(
+        "SELECT bus_id FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    if not bus or not bus["bus_id"]:
+        conn.close()
+        return jsonify({})
+
+    status = conn.execute(
+        "SELECT eta FROM bus_status WHERE bus_id = ?",
+        (bus["bus_id"],)
+    ).fetchone()
+
+    conn.close()
+
+    if status:
+        return jsonify({"eta": status["eta"]})
+
+    return jsonify({})
+
+@app.route("/student/get_bus_pickups")
+def student_get_bus_pickups():
+
+    if "user_id" not in session:
+        return jsonify([])
+
+    conn = get_db_connection()
+
+    user = conn.execute(
+        "SELECT bus_id FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    if not user or not user["bus_id"]:
+        conn.close()
+        return jsonify([])
+
+    pickups = conn.execute("""
+        SELECT pickup_name, latitude, longitude
+        FROM pickup_points
+        WHERE bus_id = ?
+    """, (user["bus_id"],)).fetchall()
+
+    conn.close()
+
+    return jsonify([
+        {
+            "name": p["pickup_name"],
+            "lat": p["latitude"],
+            "lng": p["longitude"]
+        } for p in pickups
+    ])
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=False)
 
 

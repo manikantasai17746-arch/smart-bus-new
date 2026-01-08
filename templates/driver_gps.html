@@ -1,56 +1,244 @@
-{% extends "base.html" %}
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Driver Live GPS</title>
+
+    <!-- Leaflet -->
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0b1c2d;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #info {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        button {
+            padding: 8px 14px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
 
 <h2>🚍 Driver Live GPS</h2>
 
-<p id="status">Click start to share location</p>
+<div id="info">
+    🚗 Speed: <b><span id="speed">0</span> km/h</b> |
+    ⏱ ETA: <b><span id="eta">--</span> min</b> |
+    📏 Distance: <b><span id="distance">--</span></b>
+</div>
 
 <button onclick="startTracking()">▶ Start Sharing Location</button>
 <button onclick="stopTracking()">⏹ Stop</button>
 
+<div id="map"></div>
+
 <script>
+/* ================= MAP ================= */
+let map = L.map('map').setView([17.385, 78.4867], 14);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+}).addTo(map);
+
+/* ================= ICONS ================= */
+let pickupIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+
+/* ================= MARKERS ================= */
+let driverMarker = L.marker([17.385, 78.4867]).addTo(map);
+
+let destinationLat = 17.089148;
+let destinationLng = 82.06599;
+
+L.marker([destinationLat, destinationLng], { icon: pickupIcon })
+    .addTo(map)
+    .bindPopup("🎓 College");
+
+/* ================= PICKUPS ================= */
+let pickupMarkers = [];
+
+function loadPickups() {
+    fetch("/driver/get_pickups")
+        .then(res => res.json())
+        .then(points => {
+
+            pickupMarkers.forEach(m => map.removeLayer(m));
+            pickupMarkers = [];
+
+            points.forEach(p => {
+                let m = L.marker([p.lat, p.lng], { icon: pickupIcon })
+                    .addTo(map)
+                    .bindPopup("📍 " + p.name);
+                pickupMarkers.push(m);
+            });
+        });
+}
+
+/* ================= ROUTING ================= */
+let routeControl = null;
+let lastRouteLat = null;
+let lastRouteLng = null;
+
+function drawRoute(lat, lng) {
+
+    fetch("/driver/get_pickups")
+        .then(res => res.json())
+        .then(points => {
+
+            if (points.length === 0) return;
+
+            let waypoints = [
+                L.latLng(lat, lng),
+                ...points.map(p => L.latLng(p.lat, p.lng)),
+                L.latLng(destinationLat, destinationLng)
+            ];
+
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
+
+            routeControl = L.Routing.control({
+                waypoints: waypoints,
+                addWaypoints: false,
+                draggableWaypoints: false,
+                show: false,
+                lineOptions: {
+                    styles: [{ color: "blue", weight: 5 }]
+                },
+                router: L.Routing.osrmv1({
+                    serviceUrl: "https://router.project-osrm.org/route/v1"
+                })
+            })
+            .on('routesfound', function (e) {
+
+                const route = e.routes[0];
+
+                // ETA
+                const minutes = Math.ceil(route.summary.totalTime / 60);
+                document.getElementById("eta").innerText = minutes;
+
+                // DISTANCE (ROAD DISTANCE)
+                const km = (route.summary.totalDistance / 1000).toFixed(2);
+                document.getElementById("distance").innerText = km + " km";
+
+                // send ETA to backend
+                fetch("/driver/update_eta", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ eta: minutes })
+                });
+            })
+            .addTo(map);
+        });
+}
+
+/* ================= SPEED ================= */
+let lastPos = null;
+let lastTime = null;
+
+function calculateSpeed(lat, lng) {
+
+    if (!lastPos) {
+        lastPos = { lat, lng };
+        lastTime = Date.now();
+        return 0;
+    }
+
+    const R = 6371;
+    const dLat = (lat - lastPos.lat) * Math.PI / 180;
+    const dLng = (lng - lastPos.lng) * Math.PI / 180;
+
+    const a =
+        Math.sin(dLat/2)**2 +
+        Math.cos(lastPos.lat*Math.PI/180) *
+        Math.cos(lat*Math.PI/180) *
+        Math.sin(dLng/2)**2;
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const dist = R * c;
+
+    const now = Date.now();
+    const hours = (now - lastTime) / 3600000;
+
+    lastPos = { lat, lng };
+    lastTime = now;
+
+    if (hours === 0) return 0;
+    return (dist / hours).toFixed(1);
+}
+
+/* ================= GPS ================= */
 let watchId = null;
 
 function startTracking() {
+
     if (!navigator.geolocation) {
-        alert("Geolocation not supported");
+        alert("GPS not supported");
         return;
     }
 
-    document.getElementById("status").innerText = "📡 Sharing location...";
+    loadPickups();
 
     watchId = navigator.geolocation.watchPosition(
-        position => {
-            const data = {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude
-            };
+        pos => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
 
-            fetch("/update_location", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(data)
-            });
+            driverMarker.setLatLng([lat, lng]);
+            map.setView([lat, lng], 16, { animate: true });
+
+            // speed
+            document.getElementById("speed").innerText =
+                calculateSpeed(lat, lng);
+
+            // route redraw only if moved significantly
+            if (
+                lastRouteLat === null ||
+                Math.abs(lat - lastRouteLat) > 0.003 ||
+                Math.abs(lng - lastRouteLng) > 0.003
+            ) {
+                drawRoute(lat, lng);
+                lastRouteLat = lat;
+                lastRouteLng = lng;
+            }
         },
-        error => {
-            alert("GPS error: " + error.message);
-        },
-        {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 5000
-        }
+        err => alert(err.message),
+        { enableHighAccuracy: true }
     );
 }
 
 function stopTracking() {
-    if (watchId !== null) {
+    if (watchId) {
         navigator.geolocation.clearWatch(watchId);
-        document.getElementById("status").innerText = "⛔ Location sharing stopped";
     }
+    alert("Tracking stopped");
 }
 </script>
 
-{% endblock %}
+</body>
+</html>

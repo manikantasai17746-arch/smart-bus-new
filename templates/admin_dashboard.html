@@ -41,6 +41,7 @@
         }
     </style>
 </head>
+
 <body>
 
 <h1>Admin Dashboard</h1>
@@ -53,6 +54,15 @@
     <a href="{{ url_for('admin_add_driver') }}" class="btn">👨‍✈️ Add Driver</a>
 
 </div>
+<div style="margin-top:20px; background:#222; padding:15px; border-radius:10px;">
+    <h3 style="color:#00ffcc;">📊 System Analytics</h3>
+
+    <p>👨‍🎓 Total Students: <b>{{ total_students }}</b></p>
+    <p>🧑‍✈️ Total Drivers: <b>{{ total_drivers }}</b></p>
+    <p>🚌 Total Buses: <b>{{ total_buses }}</b></p>
+    <p>📡 Students Tracking Now: <b>{{ active_tracking }}</b></p>
+</div>
+
 
 </body>
 </html>
