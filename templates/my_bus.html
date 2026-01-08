@@ -82,7 +82,9 @@ let pickupIcon = L.icon({
 });
 
 /* ================= MARKERS ================= */
-let driverMarker = L.marker([0,0]).addTo(map);
+let driverMarker = L.marker([0,0], { icon: driverIcon })
+    .addTo(map)
+    .bindPopup("🚌 Bus Location");
 
 let destinationLat = 17.089148;
 let destinationLng = 82.06599;
@@ -98,6 +100,14 @@ let lastRouteLng = null;
 /* ====== PICKUP ALERT VARIABLES ====== */
 let myPickup = null;
 let pickupAlertShown = false;
+
+let driverIcon = L.icon({
+    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34]
+});
 
 /* ================= LOAD DRIVER LOCATION ================= */
 function loadLocation() {

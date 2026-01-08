@@ -209,6 +209,17 @@ function startTracking() {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
 
+            // 🔥 SEND DRIVER LOCATION TO BACKEND
+            fetch("/driver/update_location", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    lat: lat,
+                    lng: lng
+                })
+            });
+
+            // update driver map
             driverMarker.setLatLng([lat, lng]);
             map.setView([lat, lng], 16, { animate: true });
 
@@ -216,7 +227,7 @@ function startTracking() {
             document.getElementById("speed").innerText =
                 calculateSpeed(lat, lng);
 
-            // route redraw only if moved significantly
+            // redraw route only if moved enough
             if (
                 lastRouteLat === null ||
                 Math.abs(lat - lastRouteLat) > 0.003 ||
