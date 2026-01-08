@@ -288,15 +288,14 @@ def driver_update_location():
         return jsonify({"error": "unauthorized"}), 403
 
     data = request.json
-    lat = data.get("latitude")
-    lng = data.get("longitude")
+    lat = data.get("lat")
+    lng = data.get("lng")
 
-    if not lat or not lng:
+    if lat is None or lng is None:
         return jsonify({"error": "invalid data"}), 400
 
     conn = get_db_connection()
 
-    # get driver's bus
     bus = conn.execute("""
         SELECT bus_id FROM users WHERE id = ?
     """, (session["user_id"],)).fetchone()
@@ -305,15 +304,21 @@ def driver_update_location():
         conn.close()
         return jsonify({"error": "no bus assigned"}), 400
 
+    # 🔥 UPSERT: one row per bus
     conn.execute("""
-        INSERT INTO driver_location (driver_id, bus_id, latitude, longitude)
-        VALUES (?, ?, ?, ?)
-    """, (session["user_id"], bus["bus_id"], lat, lng))
+        INSERT INTO bus_status (bus_id, latitude, longitude, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(bus_id) DO UPDATE SET
+            latitude = excluded.latitude,
+            longitude = excluded.longitude,
+            updated_at = CURRENT_TIMESTAMP
+    """, (bus["bus_id"], lat, lng))
 
     conn.commit()
     conn.close()
 
     return jsonify({"status": "ok"})
+
 
 
 
@@ -775,10 +780,8 @@ def student_get_location():
 
     loc = conn.execute("""
         SELECT latitude, longitude
-        FROM bus_location
+        FROM bus_status
         WHERE bus_id = ?
-        ORDER BY updated_at DESC
-        LIMIT 1
     """, (user["bus_id"],)).fetchone()
 
     conn.close()
@@ -790,6 +793,7 @@ def student_get_location():
         })
 
     return jsonify({})
+
 
 
 
