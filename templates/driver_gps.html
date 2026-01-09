@@ -6,9 +6,9 @@
 
     <!-- Leaflet -->
     <link rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet"
-          href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css">
+          href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
@@ -19,20 +19,21 @@
             padding: 20px;
             background: #0b1c2d;
             color: white;
-            font-family: Arial;
+            font-family: Arial, sans-serif;
         }
         #info {
             margin-bottom: 10px;
             font-size: 16px;
         }
-        #map {
-            height: 520px;
-            border-radius: 10px;
-        }
         button {
             padding: 8px 14px;
-            margin-right: 8px;
+            margin-right: 10px;
             cursor: pointer;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 10px;
         }
     </style>
 </head>
@@ -44,82 +45,124 @@
 <div id="info">
     🚗 Speed: <b><span id="speed">0</span> km/h</b> |
     ⏱ ETA: <b><span id="eta">--</span> min</b> |
-    📏 Distance: <b><span id="distance">--</span> km</b>
+    📏 Distance: <b><span id="distance">--</span></b>
 </div>
 
-<button onclick="startTracking()">▶ Start Tracking</button>
-<button onclick="stopTracking()">⏸ Stop</button>
+<button onclick="startTracking()">▶ Start Sharing Location</button>
+<button onclick="stopTracking()">⏹ Stop</button>
 
 <div id="map"></div>
 
 <script>
 /* ================= MAP ================= */
-const map = L.map("map").setView([17.385, 78.4867], 14);
+let map = L.map('map').setView([17.385, 78.4867], 14);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
 }).addTo(map);
 
 /* ================= ICONS ================= */
-const driverIcon = L.icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
-});
-
-const pickupIcon = L.icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
-});
-
-const destinationIcon = L.icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+let pickupIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41]
 });
 
 /* ================= MARKERS ================= */
-const driverMarker = L.marker([0,0], { icon: driverIcon })
-    .addTo(map)
-    .bindPopup("🚌 Driver");
+let driverMarker = L.marker([17.385, 78.4867]).addTo(map);
 
-const destinationLat = 17.089148;
-const destinationLng = 82.06599;
+let destinationLat = 17.089148;
+let destinationLng = 82.06599;
 
-L.marker([destinationLat, destinationLng], { icon: destinationIcon })
+L.marker([destinationLat, destinationLng], { icon: pickupIcon })
     .addTo(map)
     .bindPopup("🎓 College");
 
+/* ================= PICKUPS ================= */
 let pickupMarkers = [];
-let routeLine = null;
-let fullRoute = [];
-let remainingRoute = [];
 
-/* ================= LOAD PICKUPS ================= */
-async function loadPickups() {
-    const res = await fetch("/driver/get_pickups");
-    const pickups = await res.json();
+function loadPickups() {
+    fetch("/driver/get_pickups")
+        .then(res => res.json())
+        .then(points => {
 
-    pickupMarkers.forEach(m => map.removeLayer(m));
-    pickupMarkers = [];
+            pickupMarkers.forEach(m => map.removeLayer(m));
+            pickupMarkers = [];
 
-    pickups.forEach(p => {
-        const m = L.marker([p.lat, p.lng], { icon: pickupIcon })
-            .addTo(map)
-            .bindPopup("📍 " + p.name);
-        pickupMarkers.push(m);
-    });
+            points.forEach(p => {
+                let m = L.marker([p.lat, p.lng], { icon: pickupIcon })
+                    .addTo(map)
+                    .bindPopup("📍 " + p.name);
+                pickupMarkers.push(m);
+            });
+        });
+}
+
+/* ================= ROUTING ================= */
+let routeControl = null;
+let lastRouteLat = null;
+let lastRouteLng = null;
+
+function drawRoute(lat, lng) {
+
+    fetch("/driver/get_pickups")
+        .then(res => res.json())
+        .then(points => {
+
+            if (points.length === 0) return;
+
+            let waypoints = [
+                L.latLng(lat, lng),
+                ...points.map(p => L.latLng(p.lat, p.lng)),
+                L.latLng(destinationLat, destinationLng)
+            ];
+
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
+
+            routeControl = L.Routing.control({
+                waypoints: waypoints,
+                addWaypoints: false,
+                draggableWaypoints: false,
+                show: false,
+                lineOptions: {
+                    styles: [{ color: "blue", weight: 5 }]
+                },
+                router: L.Routing.osrmv1({
+                    serviceUrl: "https://router.project-osrm.org/route/v1"
+                })
+            })
+            .on('routesfound', function (e) {
+
+                const route = e.routes[0];
+
+                // ETA
+                const minutes = Math.ceil(route.summary.totalTime / 60);
+                document.getElementById("eta").innerText = minutes;
+
+                // DISTANCE (ROAD DISTANCE)
+                const km = (route.summary.totalDistance / 1000).toFixed(2);
+                document.getElementById("distance").innerText = km + " km";
+
+                // send ETA to backend
+                fetch("/driver/update_eta", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ eta: minutes })
+                });
+            })
+            .addTo(map);
+        });
 }
 
 /* ================= SPEED ================= */
 let lastPos = null;
 let lastTime = null;
 
-function calcSpeed(lat, lng) {
+function calculateSpeed(lat, lng) {
+
     if (!lastPos) {
         lastPos = { lat, lng };
         lastTime = Date.now();
@@ -136,97 +179,24 @@ function calcSpeed(lat, lng) {
         Math.cos(lat*Math.PI/180) *
         Math.sin(dLng/2)**2;
 
-    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const hours = (Date.now() - lastTime) / 3600000;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const dist = R * c;
+
+    const now = Date.now();
+    const hours = (now - lastTime) / 3600000;
 
     lastPos = { lat, lng };
-    lastTime = Date.now();
+    lastTime = now;
 
-    return hours > 0 ? (dist / hours).toFixed(1) : 0;
-}
-
-/* ================= BUILD ROUTE ONCE ================= */
-async function buildRoute(startLat, startLng) {
-    const res = await fetch("/driver/get_route_data");
-    const data = await res.json();
-
-    const waypoints = [
-        L.latLng(startLat, startLng),
-        ...data.pickups.map(p => L.latLng(p.lat, p.lng)),
-        L.latLng(data.destination.lat, data.destination.lng)
-    ];
-
-    const control = L.Routing.control({
-        waypoints,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        show: false,
-        router: L.Routing.osrmv1({
-            serviceUrl: "https://router.project-osrm.org/route/v1"
-        })
-    });
-
-    control.on("routesfound", e => {
-        const route = e.routes[0];
-
-        fullRoute = route.coordinates;
-        remainingRoute = [...fullRoute];
-
-        if (routeLine) map.removeLayer(routeLine);
-        routeLine = L.polyline(remainingRoute, {
-            color: "blue",
-            weight: 5
-        }).addTo(map);
-
-        const km = (route.summary.totalDistance / 1000).toFixed(2);
-        const min = Math.ceil(route.summary.totalTime / 60);
-
-        document.getElementById("distance").innerText = km;
-        document.getElementById("eta").innerText = min;
-
-        updateBackend(startLat, startLng, km, min);
-    });
-
-    control.addTo(map);
-}
-
-/* ================= SHRINK ROUTE ================= */
-function shrinkRoute(lat, lng) {
-    if (!remainingRoute.length) return;
-
-    let minIdx = 0;
-    let minDist = Infinity;
-
-    remainingRoute.forEach((p, i) => {
-        const d = Math.hypot(p.lat - lat, p.lng - lng);
-        if (d < minDist) {
-            minDist = d;
-            minIdx = i;
-        }
-    });
-
-    remainingRoute = remainingRoute.slice(minIdx);
-    routeLine.setLatLngs(remainingRoute);
-}
-
-/* ================= BACKEND UPDATE ================= */
-function updateBackend(lat, lng, dist, eta) {
-    fetch("/driver/update_location", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            lat: lat,
-            lng: lng,
-            distance: dist,
-            eta: eta
-        })
-    });
+    if (hours === 0) return 0;
+    return (dist / hours).toFixed(1);
 }
 
 /* ================= GPS ================= */
 let watchId = null;
 
 function startTracking() {
+
     if (!navigator.geolocation) {
         alert("GPS not supported");
         return;
@@ -239,22 +209,33 @@ function startTracking() {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
 
+            // 🔥 SEND DRIVER LOCATION TO BACKEND
+            fetch("/driver/update_location", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    lat: lat,
+                    lng: lng
+                })
+            });
+
+            // update driver map
             driverMarker.setLatLng([lat, lng]);
             map.setView([lat, lng], 16, { animate: true });
 
+            // speed
             document.getElementById("speed").innerText =
-                calcSpeed(lat, lng);
+                calculateSpeed(lat, lng);
 
-            if (!fullRoute.length) {
-                buildRoute(lat, lng);
-            } else {
-                shrinkRoute(lat, lng);
-                updateBackend(
-                    lat,
-                    lng,
-                    document.getElementById("distance").innerText,
-                    document.getElementById("eta").innerText
-                );
+            // redraw route only if moved enough
+            if (
+                lastRouteLat === null ||
+                Math.abs(lat - lastRouteLat) > 0.003 ||
+                Math.abs(lng - lastRouteLng) > 0.003
+            ) {
+                drawRoute(lat, lng);
+                lastRouteLat = lat;
+                lastRouteLng = lng;
             }
         },
         err => alert(err.message),
@@ -263,7 +244,9 @@ function startTracking() {
 }
 
 function stopTracking() {
-    if (watchId) navigator.geolocation.clearWatch(watchId);
+    if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+    }
     alert("Tracking stopped");
 }
 </script>
