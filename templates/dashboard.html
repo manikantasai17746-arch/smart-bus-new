@@ -5,8 +5,131 @@
 {% block content %}
 <div class="page-content">
     <h2>Welcome, {{ session.get('username') }}</h2>
-    <p>Dashboard Page</p>
-    <p>Navigation bar is working 🎉</p>
-</div>
-{% endblock %}
 
+    <hr>
+
+    <!-- 🚍 BUS STATUS -->
+    <h3 id="busStatus">Loading bus status...</h3>
+
+    <!-- STEPPER -->
+    <div class="stepper">
+        <div class="step" id="step-far">
+            <div class="circle"></div>
+            <span>Far</span>
+        </div>
+
+        <div class="line"></div>
+
+        <div class="step" id="step-way">
+            <div class="circle"></div>
+            <span>On the way</span>
+        </div>
+
+        <div class="line"></div>
+
+        <div class="step" id="step-approaching">
+            <div class="circle"></div>
+            <span>Approaching</span>
+        </div>
+
+        <div class="line"></div>
+
+        <div class="step" id="step-arrived">
+            <div class="circle"></div>
+            <span>Pickup Done</span>
+        </div>
+
+        <div class="line"></div>
+
+        <div class="step" id="step-college">
+            <div class="circle"></div>
+            <span>Arrived to College</span>
+        </div>
+    </div>
+</div>
+
+<!-- 🎨 STYLE -->
+<style>
+.stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 13px;
+    color: #999;
+}
+
+.circle {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #bbb;
+    margin-bottom: 6px;
+}
+
+.line {
+    width: 50px;
+    height: 3px;
+    background: #ccc;
+    margin: 0 6px;
+}
+
+.step.active .circle {
+    background: #28a745;
+}
+
+.step.active span {
+    color: #28a745;
+    font-weight: bold;
+}
+</style>
+
+<!-- 🧠 SCRIPT -->
+<script>
+async function loadBusStatus() {
+    const res = await fetch("/student/bus_status");
+    const data = await res.json();
+
+    if (!data.status) return;
+
+    document.getElementById("busStatus").innerText =
+        `Bus is ${data.status} (${data.distance_m} m)`;
+
+    updateStepper(data.status);
+}
+
+function updateStepper(status) {
+    // reset
+    document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
+
+    if (status === "Arrived to College") {
+        activate(["step-far","step-way","step-approaching","step-arrived","step-college"]);
+    }
+    else if (status === "Arrived") {
+        activate(["step-far","step-way","step-approaching","step-arrived"]);
+    }
+    else if (status === "Approaching") {
+        activate(["step-far","step-way","step-approaching"]);
+    }
+    else {
+        activate(["step-far","step-way"]);
+    }
+}
+
+function activate(ids) {
+    ids.forEach(id => {
+        document.getElementById(id).classList.add("active");
+    });
+}
+
+loadBusStatus();
+setInterval(loadBusStatus, 5000);
+</script>
+
+{% endblock %}

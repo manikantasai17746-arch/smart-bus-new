@@ -1,42 +1,63 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Driver</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Add Bus{% endblock %}
 
-<h2>Add Driver</h2>
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 
-<form method="POST">
+<div class="glass-page">
 
-    <!-- NEW -->
-    <label>Driver Name:</label><br>
-    <input type="text" name="driver_name" required><br><br>
+  <div class="glass-card">
 
-    <!-- NEW -->
-    <label>Driver Phone:</label><br>
-    <input type="text" name="driver_phone" required><br><br>
+    <div class="glass-header">
+    <div class="icon-circle">
+    <span class="material-symbols-outlined">person_add</span>
+</div>
 
-    <label>Username:</label><br>
-    <input type="text" name="username" required><br><br>
 
-    <label>Email:</label><br>
-    <input type="email" name="email" required><br><br>
+      <h1>Add New DRIVER</h1>
+      <p>Register a driver and assign BUS details</p>
+    </div>
 
-    <label>Password:</label><br>
-    <input type="password" name="password" required><br><br>
+    <form method="POST">
 
-    <label>Assign Bus:</label><br>
+  <!-- DRIVER DETAILS -->
+  <div class="glass-section">
+    <span class="section-title green">DRIVER DETAILS</span>
+    <input type="text" name="driver_name" placeholder="Full Name" required>
+    <input type="text" name="phone" placeholder="Driver Phone" required>
+
+  </div>
+  
+
+
+  <!-- LOGIN CREDENTIALS -->
+  <div class="glass-section">
+    <span class="section-title blue">LOGIN CREDENTIALS</span>
+    <input type="text" name="username" placeholder="Username" required>
+    <input type="email" name="email" placeholder="Login Email" required>
+    <input type="password" name="password" placeholder="Password" required>
+  </div>
+
+  <!-- ASSIGN BUS -->
+  <div class="glass-section">
+    <span class="section-title">ASSIGN BUS</span>
     <select name="bus_id" required>
-        {% for bus in buses %}
-            <option value="{{ bus.id }}">
-                {{ bus.bus_number }} - {{ bus.route }}
-            </option>
-        {% endfor %}
-    </select><br><br>
+      {% for bus in buses %}
+        <option value="{{ bus.id }}">
+          {{ bus.bus_number }} - {{ bus.route }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
 
-    <button type="submit">Create Driver</button>
+  <button type="submit" class="neon-btn">
+    Create Driver Account
+  </button>
+
 </form>
 
-</body>
-</html>
+
+  </div>
+</div>
+
+{% endblock %}

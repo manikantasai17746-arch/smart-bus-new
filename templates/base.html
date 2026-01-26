@@ -6,12 +6,25 @@
 
     <!-- NAVBAR CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}">
+    
 
     <!-- GOOGLE ICONS -->
     <link rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
 </head>
 <body>
+    {% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash-container">
+      {% for message in messages %}
+        <div class="flash-message">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
 
     {% include 'navbar.html' %}
 
@@ -19,6 +32,40 @@
         {% block content %}{% endblock %}
     </div>
 
-</body>
+{% if session.get("role") == "driver" %}
+<script>
+let watchId = null;
+
+function startDriverTracking() {
+    if (!navigator.geolocation) {
+        console.log("GPS not supported");
+        return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+        pos => {
+            fetch("/driver/update_location", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude
+                })
+            });
+        },
+        err => console.log("GPS error", err),
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 5000
+        }
+    );
+}
+
+startDriverTracking();
+</script>
+{% endif %}
+
+  </body>
 </html>
 

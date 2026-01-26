@@ -1,32 +1,66 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Bus</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h2>Add Bus</h2>
+{% block title %}Add New Bus{% endblock %}
 
-<form method="POST">
-    <input name="bus_number" placeholder="Bus Number" required><br><br>
-    <input name="registration_number" placeholder="Registration Number" required><br><br>
-    <input name="driver_name" placeholder="Driver Name" required><br><br>
-    <input name="route" placeholder="Route" required><br><br>
+{% block content %}
+<div class="glass-page">
 
-    <!-- OPTIONAL USER -->
-    <select name="user_id">
-        <option value="">-- Not Assigned --</option>
-        {% for user in users %}
-            <option value="{{ user.id }}">{{ user.username }}</option>
-        {% endfor %}
-    </select><br><br>
+    <div class="glass-card">
 
-    <button type="submit">Add Bus</button>
-</form>
+        <div class="glass-header">
+            <div class="icon-circle">
+                <span class="material-symbols-outlined">directions_bus</span>
+            </div>
+            <h2>Add New Bus</h2>
+            <p style="opacity:0.7;">Register a bus and assign route details</p>
+        </div>
 
-<br>
-<a href="{{ url_for('admin_dashboard') }}">⬅ Back</a>
+        <form method="POST">
 
-</body>
-</html>
+            <!-- BUS INFORMATION -->
+            <div class="glass-section">
+                <span class="section-title blue">BUS INFORMATION</span>
 
+                <input
+                    type="text"
+                    name="bus_number"
+                    placeholder="Bus Number (e.g. TS09 AB 1234)"
+                    required
+                >
+
+                <input
+                    type="text"
+                    name="registration_number"
+                    placeholder="Registration Number"
+                    required
+                >
+            </div>
+
+            <!-- ROUTE DETAILS -->
+            <div class="glass-section">
+                <span class="section-title green">ROUTE DETAILS</span>
+
+                <input
+                    type="text"
+                    name="route"
+                    placeholder="Route (e.g. College – City)"
+                    required
+                >
+
+                <input
+                    type="text"
+                    name="driver_name"
+                    placeholder="Assigned Driver Name"
+                >
+            </div>
+
+            <button type="submit" class="neon-btn">
+                Create Bus
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+{% endblock %}

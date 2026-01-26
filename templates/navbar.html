@@ -11,15 +11,16 @@
             </a>
         </li>
 
-        <!-- 🏠 HOME (STUDENT ONLY) -->
-        {% if session.get("role") == "student" %}
-        <li class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
-            <a href="{{ url_for('dashboard') }}">
-                <span class="material-symbols-outlined">home</span>
-                <span>Home</span>
-            </a>
-        </li>
-        {% endif %}
+        <!-- 🏠 HOME (STUDENT + DRIVER) -->
+{% if session.get("role") in ["student", "driver"] %}
+<li class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+    <a href="{{ url_for('dashboard') }}">
+        <span class="material-symbols-outlined">home</span>
+        <span>Home</span>
+    </a>
+</li>
+{% endif %}
+
 
         <!-- 🚌 MY BUS (STUDENT ONLY) -->
         {% if session.get("role") == "student" %}
@@ -31,47 +32,73 @@
         </li>
         {% endif %}
 
-        <!-- 🧑‍✈️ DRIVER GPS (DRIVER ONLY) -->
         {% if session.get("role") == "driver" %}
-        <li>
-            <a href="{{ url_for('driver_gps') }}">
-                <span class="material-symbols-outlined">location_on</span>
-                <span>Driver GPS</span>
-            </a>
-        </li>
-        {% endif %}
+<li class="{% if request.endpoint == 'driver_gps' %}active{% endif %}">
+    <a href="{{ url_for('driver_gps') }}">
+        <span class="material-symbols-outlined">location_on</span>
+        <span>Driver GPS</span>
+    </a>
+</li>
+{% endif %}
+
 
         <!-- 🛠 ADMIN MENU (ADMIN ONLY) -->
-        {% if session.get("role") == "admin" %}
-        <li>
-            <a href="{{ url_for('admin_dashboard') }}">
-                <span class="material-symbols-outlined">dashboard</span>
-                <span>Admin Dashboard</span>
-            </a>
-        </li>
+{% if session.get("role") == "admin" %}
 
-        <li>
-            <a href="{{ url_for('admin_add_bus') }}">
-                <span class="material-symbols-outlined">directions_bus</span>
-                <span>Add Bus</span>
-            </a>
-        </li>
+<li class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+    <a href="{{ url_for('admin_dashboard') }}">
+        <span class="material-symbols-outlined">dashboard</span>
+        <span>Admin Dashboard</span>
+    </a>
+</li>
 
-        <li>
-            <a href="{{ url_for('admin_add_driver') }}">
-                <span class="material-symbols-outlined">person_add</span>
-                <span>Add Driver</span>
-            </a>
-        </li>
-        {% endif %}
+<li class="{% if request.endpoint == 'admin_add_bus' %}active{% endif %}">
+    <a href="{{ url_for('add_bus') }}">
+        <span class="material-symbols-outlined">directions_bus</span>
+        <span>Add Bus</span>
+    </a>
+</li>
 
-        <!-- ACCOUNT -->
-        <li class="{% if request.endpoint == 'profile' %}active{% endif %}">
-            <a href="{{ url_for('profile') }}">
-                <span class="material-symbols-outlined">account_circle</span>
-                <span>Account</span>
-            </a>
-        </li>
+<li class="{% if request.endpoint == 'admin_add_driver' %}active{% endif %}">
+    <a href="{{ url_for('admin_add_driver') }}">
+        <span class="material-symbols-outlined">person_add</span>
+        <span>Add Driver</span>
+    </a>
+</li>
+
+<li class="{% if request.endpoint == 'admin_complaints' %}active{% endif %}">
+    <a href="{{ url_for('admin_complaints') }}">
+        <span class="material-symbols-outlined">report_problem</span>
+        <span>Complaints</span>
+    </a>
+</li>
+
+<li class="{% if request.endpoint == 'profile' %}active{% endif %}">
+    <a href="{{ url_for('profile') }}">
+        <span class="material-symbols-outlined">account_circle</span>
+        <span>Profile</span>
+    </a>
+</li>
+
+<li class="{% if request.endpoint == 'admin_data' %}active{% endif %}">
+    <a href="{{ url_for('admin_data') }}">
+        <span class="material-symbols-outlined">storage</span>
+        <span>Data</span>
+    </a>
+</li>
+
+{% endif %}
+
+
+       <!-- 👤 ACCOUNT (STUDENT + DRIVER) -->
+{% if session.get("role") in ["student", "driver"] %}
+<li class="{% if request.endpoint == 'profile' %}active{% endif %}">
+    <a href="{{ url_for('profile') }}">
+        <span class="material-symbols-outlined">account_circle</span>
+        <span>Account</span>
+    </a>
+</li>
+{% endif %}
 
         <!-- REPORT (STUDENT ONLY) -->
         {% if session.get("role") == "student" %}
@@ -102,15 +129,8 @@
             </a>
         </li>
 
-        <!-- ADMIN LOGIN (ONLY IF NOT ADMIN) -->
-        {% if session.get("role") != "admin" %}
-        <li class="admin-item">
-            <a href="{{ url_for('admin_login') }}">
-                <span class="material-symbols-outlined">admin_panel_settings</span>
-                <span>Admin Login</span>
-            </a>
-        </li>
-        {% endif %}
+        
 
     </ul>
 </div>
+

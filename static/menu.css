@@ -6,8 +6,9 @@
 
 body {
     min-height: 100vh;
-    background: linear-gradient(#051f30, #000000);
+    background: #0b1c2d;
 }
+
 
 .menu::-webkit-scrollbar {
     display: none;
@@ -69,8 +70,636 @@ a {
     background: #0c0c0c;
 }
 .main-content {
-    margin-left: 100px;
-    padding: 20px;
+    margin-left: 85px;     /* collapsed sidebar width */
+        z-index: 9999;         /* ABOVE sidebar */
+    padding: 40px;
+    min-height: 100vh;
+    background: #0b1c2d;
+    color: white;
+    transition: margin-left 0.3s ease;
+}
+.menu:hover ~ .main-content {
+    margin-left: 260px;
+}
+
+
+
+/* ===== GLASS LAYOUT FIX ===== */
+
+.main-content {
+    margin-left: 260px;   /* sidebar width */
+    padding: 40px;
+    min-height: 100vh;
+background: #0b1c2d;
+}
+
+.glass-page {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.glass-card {
+    width: 100%;
+    max-width: 700px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+    border-radius: 20px;
+    padding: 35px;
+    color: white;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+}
+
+.glass-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.icon-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(0,255,150,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+}
+
+.icon-circle span {
+    font-size: 30px;
+    color: #00ff9c;
+}
+
+.glass-section {
+    margin-bottom: 25px;
+}
+
+.section-title {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    opacity: 0.8;
+}
+
+.section-title.green { color: #00ff9c; }
+.section-title.blue { color: #4da6ff; }
+
+.glass-card input {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    outline: none;
+}
+
+.glass-card input::placeholder {
+    color: rgba(255,255,255,0.6);
+}
+
+.neon-btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #00ff9c, #00c777);
+    color: black;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.neon-btn:hover {
+    filter: brightness(1.1);
+}
+/* ===== ADMIN DATA MODERN UI ===== */
+
+.glass-card.wide {
+    max-width: 1100px;
+}
+
+.sub-text {
+    opacity: 0.7;
+    font-size: 14px;
+    margin-top: 6px;
+}
+
+.search-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 30px;
+}
+
+.search-bar input,
+.search-bar select {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255,255,255,0.15);
     color: white;
 }
 
+.search-bar select {
+    max-width: 180px;
+}
+
+.neon-btn.small {
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* TABLE */
+.table-wrapper {
+    overflow-x: auto;
+    margin-bottom: 30px;
+}
+
+.glass-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.glass-table th,
+.glass-table td {
+    padding: 14px;
+    text-align: left;
+}
+
+.glass-table thead {
+    background: rgba(255,255,255,0.12);
+}
+
+.glass-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.glass-table tbody tr:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+/* ROLE TAGS */
+.role {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.role.student { background: #2563eb; }
+.role.driver  { background: #16a34a; }
+.role.admin   { background: #dc2626; }
+
+/* DELETE BUTTON */
+.danger-btn {
+    background: #dc2626;
+    border: none;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: white;
+}
+.danger-btn:hover {
+    filter: brightness(1.1);
+}
+/* ===== ADMIN DATA SEARCH (CLEAN VERSION) ===== */
+
+.data-search {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin: 25px 0;
+}
+
+.data-search select,
+.data-search input {
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.08);
+    color: white;
+    font-size: 14px;
+    outline: none;
+}
+
+.data-search select {
+    width: 140px;
+    cursor: pointer;
+}
+
+.data-search input {
+    flex: 1;
+}
+
+.data-search input::placeholder {
+    color: rgba(255,255,255,0.5);
+}
+
+.data-search select:focus,
+.data-search input:focus {
+    border-color: #00ff9c;
+    background: rgba(255,255,255,0.12);
+}
+
+.data-search button {
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 10px;
+    border: none;
+    background: #00ff9c;
+    color: #000;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.data-search button:hover {
+    filter: brightness(1.1);
+}
+
+/* ===== ADMIN DASHBOARD ===== */
+
+.admin-header {
+    margin-bottom: 30px;
+}
+
+.admin-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.admin-header .subtitle {
+    color: #9ca3af;
+    margin-top: 6px;
+}
+
+/* GRID */
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 25px;
+}
+
+/* CARD */
+.admin-card {
+    display: flex;
+    align-items: center;
+    padding: 25px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    transition: transform 0.3s ease;
+}
+
+.admin-card:hover {
+    transform: translateY(-6px);
+}
+
+/* ICON */
+.card-icon {
+    font-size: 34px;
+    margin-right: 20px;
+}
+
+/* TEXT */
+.card-text span {
+    display: block;
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.card-text strong {
+    font-size: 28px;
+}
+
+/* COLORS */
+.admin-card.blue { background: linear-gradient(135deg, #2563eb, #1e40af); }
+.admin-card.purple { background: linear-gradient(135deg, #7c3aed, #4c1d95); }
+.admin-card.orange { background: linear-gradient(135deg, #f97316, #c2410c); }
+.admin-card.green { background: linear-gradient(135deg, #22c55e, #166534); }
+
+
+.page-content {
+    margin-top: 70px;   /* adjust if your navbar is taller */
+}
+/* Space below fixed navbar */
+.page-content {
+    margin-top: 70px;          /* navbar height */
+    padding: 10px;
+}
+
+/* ===== VERTICAL MAP LAYOUT ===== */
+
+#map,
+#map .leaflet-container {
+    width: 100%;
+    height: 70vh;          /* 👈 THIS makes it vertical */
+    min-height: 400px;
+}
+
+/* Mobile: almost full screen */
+@media (max-width: 768px) {
+    #map,
+    #map .leaflet-container {
+        height: 80vh;      /* 👈 tall map on phone */
+        min-height: 450px;
+    }
+}
+/* ================= MOBILE MAP VIEW ================= */
+
+/* Default: desktop */
+#map,
+#map .leaflet-container {
+    width: 100%;
+    height: 420px;
+}
+
+/* Mobile: full vertical map */
+@media (max-width: 768px) {
+
+    /* Remove forced heights */
+    body,
+    .main-content,
+    .page-content {
+        min-height: auto !important;
+        height: auto !important;
+    }
+
+    /* Stack content vertically */
+    .page-content {
+        padding: 8px;
+    }
+
+    /* Make map dominant */
+    #map,
+    #map .leaflet-container {
+        height: 75vh !important;   /* 🔥 vertical map */
+        min-height: 70vh;
+        border-radius: 12px;
+    }
+
+    /* Buttons full width */
+    button {
+        width: 100%;
+        margin-bottom: 8px;
+    }
+}
+/* ================= SOS ALERTS (ADMIN DASHBOARD) ================= */
+
+.sos-card {
+    border: 2px solid #dc2626;
+    border-radius: 18px;
+    padding: 25px;
+    margin-bottom: 35px;
+    background: linear-gradient(
+        135deg,
+        rgba(220,38,38,0.18),
+        rgba(255,255,255,0.05)
+    );
+    backdrop-filter: blur(14px);
+    box-shadow: 0 0 30px rgba(220,38,38,0.45);
+}
+
+.sos-card h2 {
+    margin-bottom: 15px;
+    font-size: 22px;
+    font-weight: 700;
+    color: #ff4d4d;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* SOS TABLE */
+.sos-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.sos-table thead {
+    background: rgba(255,255,255,0.15);
+}
+
+.sos-table th,
+.sos-table td {
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 14px;
+}
+
+.sos-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+
+.sos-table tbody tr:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+/* MAP LINK */
+.sos-map-link {
+    color: #00ff9c;
+    font-weight: 600;
+    text-decoration: none;
+}
+.sos-map-link:hover {
+    text-decoration: underline;
+}
+
+/* RESOLVED BUTTON */
+.sos-resolve-btn {
+    background: linear-gradient(135deg, #22c55e, #15803d);
+    border: none;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: black;
+    font-weight: 600;
+    font-size: 13px;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.sos-resolve-btn:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+
+    .sos-card {
+        padding: 18px;
+    }
+
+    .sos-table th,
+    .sos-table td {
+        font-size: 12px;
+        padding: 10px;
+    }
+
+    .sos-card h2 {
+        font-size: 18px;
+    }
+}
+.sos-btn {
+    margin-top: 15px;
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, #dc2626, #7f1d1d);
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.sos-btn:hover {
+    filter: brightness(1.1);
+}
+/* ================= DRIVER PICKUP ORDER (MODERN UI) ================= */
+
+#pickup-panel {
+    margin-top: 18px;
+    background: linear-gradient(180deg, #020617, #020617);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 0 0 1px rgba(34,197,94,0.25),
+                0 10px 30px rgba(0,0,0,0.6);
+}
+
+#pickup-panel h3 {
+    margin: 0 0 12px;
+    color: #22c55e;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+#pickupList li {
+    display: block;
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #020617;
+    border-left: 6px solid #22c55e;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#pickupList li:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 1px rgba(34,197,94,0.35),
+                0 6px 18px rgba(0,0,0,0.6);
+}
+
+#pickupList b {
+    font-size: 15px;
+    color: #e5e7eb;
+}
+
+.pickup-status {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.status-pending {
+    color: #facc15;
+}
+
+.status-approaching {
+    color: #38bdf8;
+}
+
+.status-reached {
+    color: #22c55e;
+}
+
+/* Mobile spacing */
+@media (max-width: 768px) {
+    #pickup-panel {
+        padding: 14px;
+    }
+
+    #pickupList li {
+        padding: 12px;
+    }
+}
+/* DEFAULT (collapsed) */
+.sidebar {
+    width: 64px;
+    transition: width 0.3s ease;
+}
+
+/* WHEN EXPANDED */
+body.menu-open .sidebar {
+    width: 220px;
+}
+.page-content {
+    margin-left: 64px;
+    transition: margin-left 0.3s ease;
+}
+
+/* When menu is open */
+body.menu-open .page-content {
+    margin-left: 220px;
+}
+/* Sidebar width */
+:root {
+    --sidebar-width: 70px;   /* adjust if your sidebar is wider */
+}
+
+/* Push content away from sidebar */
+.page-content {
+    margin-left: var(--sidebar-width);
+    padding-left: 15px;
+    transition: margin-left 0.3s ease;
+}
+
+/* Mobile fix */
+@media (max-width: 768px) {
+    .page-content {
+        margin-left: 60px;
+    }
+}
+
+/* ================= DRIVER LIVE STATS ================= */
+
+.driver-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.driver-stat-card {
+    flex: 1;
+    min-width: 120px;
+    background: #020617;
+    padding: 12px;
+    border-radius: 10px;
+    color: white;
+    font-size: 14px;
+}
+
+.driver-stat-card b {
+    font-size: 18px;
+}
+
+.driver-stat-speed {
+    border-left: 6px solid #38bdf8; /* blue */
+}
+
+.driver-stat-distance {
+    border-left: 6px solid #facc15; /* yellow */
+}
+
+.driver-stat-eta {
+    border-left: 6px solid #22c55e; /* green */
+}

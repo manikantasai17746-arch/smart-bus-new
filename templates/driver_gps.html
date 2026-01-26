@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}?v=99">
+
     <meta charset="UTF-8">
     <title>Driver Live GPS</title>
 
-    <!-- Leaflet -->
     <link rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet"
@@ -12,6 +15,8 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    
+
 
     <style>
         body {
@@ -40,121 +45,209 @@
 
 <body>
 
-<h2>🚍 Driver Live GPS</h2>
+{% include "navbar.html" %}
 
-<div id="info">
-    🚗 Speed: <b><span id="speed">0</span> km/h</b> |
-    ⏱ ETA: <b><span id="eta">--</span> min</b> |
-    📏 Distance: <b><span id="distance">--</span></b>
+
+
+
+
+<div class="page-content">
+    <h2>🚍 Driver Live GPS</h2>
+
+    
+
+    <button onclick="startTracking()">▶ Start Sharing Location</button>
+    <button onclick="stopTracking()">⏹ Stop</button>
+
+    <div id="map"></div>
+    <div class="driver-stats">
+    <div class="driver-stat-card driver-stat-speed">
+        🚗 Speed<br>
+        <b><span id="driverSpeed">0</span> km/h</b>
+    </div>
+
+    <div class="driver-stat-card driver-stat-distance">
+        📏 Distance<br>
+        <b><span id="driverDistance">--</span></b>
+    </div>
+
+    <div class="driver-stat-card driver-stat-eta">
+        ⏱ ETA<br>
+        <b><span id="driverETA">--</span> min</b>
+    </div>
 </div>
 
-<button onclick="startTracking()">▶ Start Sharing Location</button>
-<button onclick="stopTracking()">⏹ Stop</button>
+</div>
+ <div id="pickup-panel" style="
+      margin-top:15px;
+      background:#0f172a;   
+          border-radius:12px;
+          padding:12px;
+          ">
+  <h3>📦 Pickup Order</h3>
+  <ul id="pickupList" style="list-style:none;padding:0;"></ul>
+</div>
+
 
 <div id="map"></div>
 
-<script>
-/* ================= MAP ================= */
-let map = L.map('map').setView([17.385, 78.4867], 14);
+<button onclick="sendSOS()" class="sos-btn">
+    🚨 SOS
+</button>
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+
+
+
+<script>
+  function loadPickupOrder() {
+
+    fetch("/driver/pickup_order")
+        .then(r => r.json())
+        .then(list => {
+
+            const ul = document.getElementById("pickupList");
+            ul.innerHTML = "";
+
+            list.forEach((p, i) => {
+
+                let color = "yellow";
+                if (p.status === "Reached") color = "lime";
+                if (p.status === "Approaching") color = "deepskyblue";
+
+                ul.innerHTML += `
+                    <li style="
+                        background:#111;
+                        padding:12px;
+                        margin-bottom:8px;
+                        border-radius:8px;
+                    ">
+                        <b>
+  ${i+1}. ${p.name}
+  ${p.is_temp ? "<span style='color:#facc15;'> (TEMP)</span>" : ""}
+</b>
+<br>
+                        📏 ${p.distance} m —
+                        <span style="color:${color};font-weight:bold;">
+                            ${p.status}
+                        </span>
+                    </li>
+                `;
+            });
+        });
+}
+
+// AUTO UPDATE every 5 seconds
+setInterval(loadPickups, 5000); // every 5 seconds
+
+
+/* ================= MAP ================= */
+let map = L.map("map").setView([17.385, 78.4867], 14);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19
 }).addTo(map);
 
 /* ================= ICONS ================= */
-let pickupIcon = L.icon({
-    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+const pickupIcon = L.icon({
+    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
+    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
     iconSize: [25, 41],
     iconAnchor: [12, 41]
 });
 
 /* ================= MARKERS ================= */
 let driverMarker = L.marker([17.385, 78.4867]).addTo(map);
+let pickupMarkers = [];
 
+/* ================= STATE ================= */
 let destinationLat = 17.089148;
 let destinationLng = 82.06599;
 
-L.marker([destinationLat, destinationLng], { icon: pickupIcon })
-    .addTo(map)
-    .bindPopup("🎓 College");
+let routeControl = null;
+let pickupsCache = [];
+let tracking = false;
+let watchId = null;
+let mapCentered = false;
 
-/* ================= PICKUPS ================= */
-let pickupMarkers = [];
+let lastRouteLat = null;
+let lastRouteLng = null;
+
+/* ================= LOAD PICKUPS (ONCE) ================= */
+const tempPickupIcon = L.icon({
+    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png",
+    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34]
+});
 
 function loadPickups() {
     fetch("/driver/get_pickups")
-        .then(res => res.json())
+        .then(r => r.json())
         .then(points => {
 
-            pickupMarkers.forEach(m => map.removeLayer(m));
-            pickupMarkers = [];
+            pickupsCache = points;
+
+            // 🔥 clear old markers first
+            clearPickupMarkers();
 
             points.forEach(p => {
-                let m = L.marker([p.lat, p.lng], { icon: pickupIcon })
+
+                const iconToUse = p.is_temp ? tempPickupIcon : pickupIcon;
+
+                const m = L.marker([p.lat, p.lng], { icon: iconToUse })
                     .addTo(map)
-                    .bindPopup("📍 " + p.name);
+                    .bindPopup(
+                        p.is_temp
+                            ? "🟡 TEMP PICKUP: " + p.name
+                            : "📍 PICKUP: " + p.name
+                    );
+
                 pickupMarkers.push(m);
             });
         });
 }
 
-/* ================= ROUTING ================= */
-let routeControl = null;
-let lastRouteLat = null;
-let lastRouteLng = null;
-
+/* ================= ROUTE ================= */
 function drawRoute(lat, lng) {
 
-    fetch("/driver/get_pickups")
-        .then(res => res.json())
-        .then(points => {
+    if (pickupsCache.length === 0) return;
 
-            if (points.length === 0) return;
+    const waypoints = [
+        L.latLng(lat, lng),
+        ...pickupsCache.map(p => L.latLng(p.lat, p.lng)),
+        L.latLng(destinationLat, destinationLng)
+    ];
 
-            let waypoints = [
-                L.latLng(lat, lng),
-                ...points.map(p => L.latLng(p.lat, p.lng)),
-                L.latLng(destinationLat, destinationLng)
-            ];
+    if (routeControl) {
+        map.removeControl(routeControl);
+    }
 
-            if (routeControl) {
-                map.removeControl(routeControl);
-            }
+    routeControl = L.Routing.control({
+        waypoints,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        show: false,
+        lineOptions: {
+            styles: [{ color: "blue", weight: 5 }]
+        }
+    })
+    .on("routesfound", e => {
+        const route = e.routes[0];
 
-            routeControl = L.Routing.control({
-                waypoints: waypoints,
-                addWaypoints: false,
-                draggableWaypoints: false,
-                show: false,
-                lineOptions: {
-                    styles: [{ color: "blue", weight: 5 }]
-                },
-                router: L.Routing.osrmv1({
-                    serviceUrl: "https://router.project-osrm.org/route/v1"
-                })
-            })
-            .on('routesfound', function (e) {
+        const minutes = Math.ceil(route.summary.totalTime / 60);
+        const km = (route.summary.totalDistance / 1000).toFixed(2);
 
-                const route = e.routes[0];
+        document.getElementById("driverETA").innerText = minutes;
+        document.getElementById("driverDistance").innerText = km + " km";
 
-                // ETA
-                const minutes = Math.ceil(route.summary.totalTime / 60);
-                document.getElementById("eta").innerText = minutes;
-
-                // DISTANCE (ROAD DISTANCE)
-                const km = (route.summary.totalDistance / 1000).toFixed(2);
-                document.getElementById("distance").innerText = km + " km";
-
-                // send ETA to backend
-                fetch("/driver/update_eta", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ eta: minutes })
-                });
-            })
-            .addTo(map);
+        fetch("/driver/update_eta", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eta: minutes })
         });
+    })
+    .addTo(map);
 }
 
 /* ================= SPEED ================= */
@@ -174,12 +267,12 @@ function calculateSpeed(lat, lng) {
     const dLng = (lng - lastPos.lng) * Math.PI / 180;
 
     const a =
-        Math.sin(dLat/2)**2 +
-        Math.cos(lastPos.lat*Math.PI/180) *
-        Math.cos(lat*Math.PI/180) *
-        Math.sin(dLng/2)**2;
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lastPos.lat * Math.PI / 180) *
+        Math.cos(lat * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const dist = R * c;
 
     const now = Date.now();
@@ -188,14 +281,14 @@ function calculateSpeed(lat, lng) {
     lastPos = { lat, lng };
     lastTime = now;
 
-    if (hours === 0) return 0;
-    return (dist / hours).toFixed(1);
+    return hours > 0 ? (dist / hours).toFixed(1) : 0;
 }
 
 /* ================= GPS ================= */
-let watchId = null;
-
 function startTracking() {
+
+    if (tracking) return;
+    tracking = true;
 
     if (!navigator.geolocation) {
         alert("GPS not supported");
@@ -209,29 +302,29 @@ function startTracking() {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
 
-            // 🔥 SEND DRIVER LOCATION TO BACKEND
             fetch("/driver/update_location", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    lat: lat,
-                    lng: lng
+                    latitude: lat,
+                    longitude: lng
                 })
             });
 
-            // update driver map
             driverMarker.setLatLng([lat, lng]);
-            map.setView([lat, lng], 16, { animate: true });
 
-            // speed
-            document.getElementById("speed").innerText =
+            if (!mapCentered) {
+                map.setView([lat, lng], 16);
+                mapCentered = true;
+            }
+
+            document.getElementById("driverSpeed").innerText =
                 calculateSpeed(lat, lng);
 
-            // redraw route only if moved enough
             if (
                 lastRouteLat === null ||
-                Math.abs(lat - lastRouteLat) > 0.003 ||
-                Math.abs(lng - lastRouteLng) > 0.003
+                Math.abs(lat - lastRouteLat) > 0.005 ||
+                Math.abs(lng - lastRouteLng) > 0.005
             ) {
                 drawRoute(lat, lng);
                 lastRouteLat = lat;
@@ -246,10 +339,99 @@ function startTracking() {
 function stopTracking() {
     if (watchId) {
         navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        tracking = false;
+        alert("Tracking stopped");
     }
-    alert("Tracking stopped");
 }
 </script>
+<script>
+function sendSOS() {
+
+    if (!confirm("Send SOS alert to admin?")) return;
+
+    if (!navigator.geolocation) {
+        alert("GPS not supported");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            fetch("/driver/sos", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude
+                })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === "ok") {
+                    alert("🚨 SOS sent successfully");
+                } else {
+                    alert("❌ SOS failed");
+                }
+            })
+            .catch(() => alert("❌ Network error"));
+        },
+        () => alert("❌ GPS permission denied")
+    );
+}
+</script>
+<script>
+function loadPickupOrder() {
+    fetch("/driver/ordered_pickups")
+        .then(r => r.json())
+        .then(data => {
+
+            const ul = document.getElementById("pickupList");
+            ul.innerHTML = "";
+
+            data.forEach(p => {
+
+                // STATUS COLOR
+                let statusColor = "#facc15"; // Pending
+                if (p.status === "Approaching") statusColor = "#38bdf8";
+                if (p.status === "Reached") statusColor = "#22c55e";
+
+                // TEMP UI
+                const isTemp = p.is_temp === true;
+                const bgColor = isTemp ? "#422006" : "#020617";
+                const borderColor = isTemp ? "#facc15" : statusColor;
+                const tempBadge = isTemp
+                    ? "<span style='color:#facc15;font-weight:bold;margin-left:6px;'>(TEMP)</span>"
+                    : "";
+
+                ul.innerHTML += `
+                  <li style="
+                    margin-bottom:10px;
+                    padding:12px;
+                    border-radius:10px;
+                    background:${bgColor};
+                    border-left:6px solid ${borderColor};
+                  ">
+                    <b>${p.name}${tempBadge}</b><br>
+                    ${p.distance} m —
+                    <span style="color:${statusColor};font-weight:bold;">
+                      ${p.status}
+                    </span>
+                  </li>
+                `;
+            });
+        });
+}
+
+// auto update every 5 sec
+setInterval(loadPickupOrder, 5000);
+loadPickupOrder();
+</script>
+
+
+
+
+
+
 
 </body>
 </html>

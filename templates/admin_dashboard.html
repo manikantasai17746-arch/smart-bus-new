@@ -1,69 +1,154 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Admin Dashboard</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding-top: 60px;
-            background: #f4f4f4;
-        }
-        h1 {
-            margin-bottom: 30px;
-        }
-        .nav {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .btn {
-            display: inline-block;
-            padding: 12px 22px;
-            background: #333;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 16px;
-            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
-            transition: transform 0.2s, background 0.3s;
-        }
-        .btn:hover {
-            background: #555;
-            transform: scale(1.05);
-        }
-        @media (max-width: 600px) {
-            .btn {
-                font-size: 14px;
-                padding: 10px 18px;
-            }
-        }
-    </style>
-</head>
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
 
-<body>
+{% block content %}
+{% if sos_alerts and sos_alerts|length > 0 %}
 
-<h1>Admin Dashboard</h1>
+<div class="sos-card">
 
-<div class="nav">
-    <a href="/admin/add_bus" class="btn" aria-label="Add a new bus">➕ Add Bus</a>
-    <a href="/admin/buses" class="btn" aria-label="View all buses">🚌 View Buses</a>
-    <a href="/admin/logout" class="btn" aria-label="Logout from admin dashboard">🚪 Logout</a>
-    <a href="{{ url_for('admin_complaints') }}" class="btn" aria-label="View student complaints">📢 View Student Complaints</a>
-    <a href="{{ url_for('admin_add_driver') }}" class="btn">👨‍✈️ Add Driver</a>
+    <h2>🚨 EMERGENCY SOS ALERTS</h2>
+
+    <div class="table-wrapper">
+        <table class="sos-table">
+            <thead>
+                <tr>
+                    <th>Bus</th>
+                    <th>Driver</th>
+                    <th>Phone</th>
+                    <th>Location</th>
+                    <th>Time</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody id="sos-body">
+            {% for s in sos_alerts %}
+                <tr>
+                    <td>{{ s.bus_number }}</td>
+                    <td>{{ s.driver_name }}</td>
+                    <td>{{ s.contact }}</td>
+                    <td>
+                        <a class="sos-map-link"
+                           href="https://www.google.com/maps?q={{ s.latitude }},{{ s.longitude }}"
+                           target="_blank">
+                           📍 Map
+                        </a>
+                    </td>
+                    <td>{{ s.created_at }}</td>
+                    <td>
+                        <form method="POST"
+                              action="{{ url_for('admin_delete_sos', sos_id=s.id) }}"
+                              onsubmit="return confirm('Mark this SOS as resolved?');">
+                            <button type="submit" class="sos-resolve-btn">
+                                ✔ Resolved
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
 </div>
-<div style="margin-top:20px; background:#222; padding:15px; border-radius:10px;">
-    <h3 style="color:#00ffcc;">📊 System Analytics</h3>
+{% endif %}
 
-    <p>👨‍🎓 Total Students: <b>{{ total_students }}</b></p>
-    <p>🧑‍✈️ Total Drivers: <b>{{ total_drivers }}</b></p>
-    <p>🚌 Total Buses: <b>{{ total_buses }}</b></p>
-    <p>📡 Students Tracking Now: <b>{{ active_tracking }}</b></p>
+
+<div class="admin-header">
+    <h1>Admin Dashboard</h1>
+    <p class="subtitle">System overview & management</p>
 </div>
 
+<!-- ===== STATS ===== -->
+<div class="admin-grid">
 
-</body>
-</html>
+    <div class="admin-card blue">
+        <div class="card-icon">👨‍🎓</div>
+        <div class="card-text">
+            <span>Total Students</span>
+            <strong>{{ total_students }}</strong>
+        </div>
+    </div>
 
+    <div class="admin-card purple">
+        <div class="card-icon">🧑‍✈️</div>
+        <div class="card-text">
+            <span>Total Drivers</span>
+            <strong>{{ total_drivers }}</strong>
+        </div>
+    </div>
+
+    <div class="admin-card orange">
+        <div class="card-icon">🚌</div>
+        <div class="card-text">
+            <span>Total Buses</span>
+            <strong>{{ total_buses }}</strong>
+        </div>
+    </div>
+
+    <div class="admin-card green">
+        <div class="card-icon">📍</div>
+        <div class="card-text">
+            <span>Tracking Now</span>
+            <strong>{{ active_tracking }}</strong>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== ACTIONS ===== -->
+<h2 style="margin:40px 0 20px;">⚙️ Admin Actions</h2>
+
+<div class="admin-grid">
+
+    <a href="{{ url_for('add_bus') }}" class="admin-card clickable blue">
+        <div class="card-icon">🚌</div>
+        <div class="card-text">
+            <span>Add</span>
+            <strong>Bus</strong>
+        </div>
+    </a>
+
+    <a href="{{ url_for('admin_add_driver') }}" class="admin-card clickable purple">
+        <div class="card-icon">🧑‍✈️</div>
+        <div class="card-text">
+            <span>Add</span>
+            <strong>Driver</strong>
+        </div>
+    </a>
+
+    <a href="{{ url_for('admin_complaints') }}" class="admin-card clickable orange">
+        <div class="card-icon">📢</div>
+        <div class="card-text">
+            <span>View</span>
+            <strong>Complaints</strong>
+        </div>
+    </a>
+
+    <a href="{{ url_for('admin_data') }}" class="admin-card clickable green">
+        <div class="card-icon">📂</div>
+        <div class="card-text">
+            <span>System</span>
+            <strong>Data</strong>
+        </div>
+    </a>
+
+    <a href="{{ url_for('profile') }}" class="admin-card clickable blue">
+        <div class="card-icon">👤</div>
+        <div class="card-text">
+            <span>My</span>
+            <strong>Profile</strong>
+        </div>
+    </a>
+
+    <a href="{{ url_for('logout') }}" class="admin-card clickable danger">
+        <div class="card-icon">🚪</div>
+        <div class="card-text">
+            <span>Logout</span>
+            <strong>Admin</strong>
+        </div>
+    </a>
+
+</div>
+
+{% endblock %}

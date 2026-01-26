@@ -4,7 +4,6 @@
     <title>My Bus – Live Tracking</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}">
-
     <link rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet"
@@ -15,12 +14,14 @@
             padding: 30px;
             color: white;
         }
+       
         #map {
-            height: 500px;
-            width: 100%;
-            margin-top: 15px;
-            border-radius: 10px;
-        }
+        height: 60vh;
+        min-height: 400px;
+        width: 100%;
+        border-radius: 10px;
+         }
+
     </style>
 </head>
 
@@ -30,6 +31,48 @@
 
 <div class="main-content">
     <h2>🚍 My Bus (Live Tracking)</h2>
+    {% if not bus %}
+
+<div style="
+    margin-top:30px;
+    padding:20px;
+    border-radius:12px;
+    background:#020617;
+    border-left:6px solid #22c55e;
+">
+    <h3>🚌 Assign Your Bus</h3>
+    <p>You must assign a bus before using tracking.</p>
+
+    <form method="POST">
+        <input
+            type="text"
+            name="bus_number"
+            placeholder="Enter Bus Number"
+            required
+            style="
+                width:100%;
+                padding:12px;
+                border-radius:8px;
+                border:none;
+                margin-bottom:12px;
+            "
+        >
+        <button style="
+            width:100%;
+            padding:12px;
+            background:#22c55e;
+            color:black;
+            border:none;
+            border-radius:8px;
+            font-weight:bold;
+        ">
+            ✅ Assign Bus
+        </button>
+    </form>
+</div>
+
+{% else %}
+
 
     {% if bus %}
         <p><b>Bus Number:</b> {{ bus.bus_number }}</p>
@@ -61,89 +104,124 @@
            style="margin-top:10px;color:yellow;font-weight:bold;"></p>
 
     {% else %}
-        <p style="color:red;">❌ No bus assigned to you</p>
-
-        {% if session.get("role") == "student" %}
-        <form method="POST" style="margin-top:15px;">
-            <label>Enter Bus Number</label><br><br>
-            <input type="text" name="bus_number" required>
-            <br><br>
-            <button type="submit">Assign My Bus</button>
-        </form>
-        {% endif %}
+        <p style="color:red;">❌ No bus assigned</p>
     {% endif %}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<script>
+let lastMyPickupStatus = null;
+</script>
 
 <script>
-let map = L.map('map');
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+/* ---------------- STATE ---------------- */
+let map = L.map('map').setView([17.385, 78.4867], 13);
 
-let driverMarker = L.marker([0,0]).addTo(map);
-map.setView([17.089148, 82.06599], 15);
-// BLUE pickup icon
-let pickupIcon = L.icon({
+setTimeout(() => {
+    map.invalidateSize();
+}, 300);
+let driverMarker = null;
+let pickupMarker = null;
+let routingControl = null;
+
+let pickupLat = null;
+let pickupLng = null;
+
+let driverReady = false;
+let routeDrawn = false;
+let mapCentered = false;
+
+/* ---------------- MAP ---------------- */
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+    .addTo(map);
+
+
+/* ---------------- ICON ---------------- */
+const pickupIcon = L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
+    popupAnchor: [1, -34]
 });
 
-let pickupMarker = null;
+/* ---------------- HELPERS ---------------- */
+function distanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
 
-let routingControl = null;
-let driverReady = false;
+    const a =
+        Math.sin(dLat/2) ** 2 +
+        Math.cos(lat1 * Math.PI/180) *
+        Math.cos(lat2 * Math.PI/180) *
+        Math.sin(dLon/2) ** 2;
 
-function loadLocation() {
-    fetch("/student/get_location")
-        .then(res => res.json())
-        .then(data => {
-            if (data.latitude && data.longitude) {
-                driverMarker.setLatLng([data.latitude, data.longitude]);
-                map.setView([data.latitude, data.longitude], 13);
-                driverReady = true;
-                checkArrival(data.latitude, data.longitude);
-            }
-        });
-        
-         // -------- PICKUP LOCATION (NEW CODE) --------
-    fetch("/student/get_pickup")
-        .then(res => res.json())
-        .then(pickup => {
-            if (pickup.latitude && pickup.longitude) {
-
-                if (!pickupMarker) {
-                    pickupMarker = L.marker(
-                        [pickup.latitude, pickup.longitude],
-                        { icon: pickupIcon }
-                    )
-                    .addTo(map)
-                    .bindPopup("📍 My Pickup Point");
-                } else {
-                    pickupMarker.setLatLng([
-                        pickup.latitude,
-                        pickup.longitude
-                    ]);
-                }
-            }
-        }); 
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/* ---------------- FETCH PICKUP ---------------- */
+function loadPickup() {
+    fetch("/student/get_pickup")
+        .then(r => r.json())
+        .then(p => {
+            if (!p.latitude || !p.longitude) return;
+
+            pickupLat = p.latitude;
+            pickupLng = p.longitude;
+
+            if (!pickupMarker) {
+                pickupMarker = L.marker(
+                    [pickupLat, pickupLng],
+                    { icon: pickupIcon }
+                ).addTo(map).bindPopup("📍 My Pickup Point");
+            }
+        });
+}
+
+/* ---------------- FETCH DRIVER ---------------- */
+function loadLocation() {
+    fetch("/student/get_location")
+        .then(r => r.json())
+        .then(d => {
+            if (!d.latitude || !d.longitude) return;
+
+            // ✅ create marker ONLY when first GPS arrives
+            if (!driverMarker) {
+                driverMarker = L.marker([d.latitude, d.longitude]).addTo(map);
+                map.setView([d.latitude, d.longitude], 13);
+            } else {
+                driverMarker.setLatLng([d.latitude, d.longitude]);
+            }
+
+            driverReady = true;
+
+            // ✅ center map only once
+            if (!mapCentered) {
+                mapCentered = true;
+            }
+
+            updateDistance(d.latitude, d.longitude);
+
+            // ✅ draw route ONLY when everything is ready
+            if (!routeDrawn && pickupLat !== null && driverMarker) {
+                drawRoute();
+            }
+        });
+}
+
+
+/* ---------------- ROUTE (ONCE) ---------------- */
 function drawRoute() {
-    if (!driverReady) return;
+    if (!driverReady || routeDrawn) return;
 
     fetch("/route_data/{{ bus.id }}")
-        .then(res => res.json())
+        .then(r => r.json())
         .then(data => {
 
-            let waypoints = [];
-
             const d = driverMarker.getLatLng();
-            waypoints.push(L.latLng(d.lat, d.lng));
+            let waypoints = [L.latLng(d.lat, d.lng)];
 
             data.pickups.forEach(p => {
                 L.marker([p.lat, p.lng])
@@ -156,10 +234,6 @@ function drawRoute() {
                 L.latLng(data.destination.lat, data.destination.lng)
             );
 
-            if (routingControl) {
-                map.removeControl(routingControl);
-            }
-
             routingControl = L.Routing.control({
                 waypoints: waypoints,
                 addWaypoints: false,
@@ -167,43 +241,350 @@ function drawRoute() {
                 show: false,
                 lineOptions: {
                     styles: [{ color: 'blue', weight: 5 }]
-                },
-                router: L.Routing.osrmv1({
-                    serviceUrl: 'https://router.project-osrm.org/route/v1'
-                })
+                }
             }).addTo(map);
+
+            routeDrawn = true;
         });
 }
 
-function distanceMeters(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
-    const dLat = (lat2-lat1) * Math.PI / 180;
-    const dLon = (lon2-lon1) * Math.PI / 180;
-    const a =
-        Math.sin(dLat/2)**2 +
-        Math.cos(lat1*Math.PI/180) *
-        Math.cos(lat2*Math.PI/180) *
-        Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
+/* ---------------- DISTANCE ---------------- */
+function updateDistance(busLat, busLng) {
+    if (pickupLat === null) return;
 
-function checkArrival(lat, lng) {
-    const d = distanceMeters(lat, lng, 17.089148, 82.06599);
+    const d = distanceMeters(busLat, busLng, pickupLat, pickupLng);
+
+    let status = "On the way";
+    if (d < 150) status = "Arrived";
+    else if (d < 500) status = "Approaching";
+
     document.getElementById("distanceText").innerText =
-        "Distance to college: " + Math.round(d) + " meters";
+        `Status: ${status} | Distance: ${Math.round(d)} meters`;
+}
+  
 
-    if (d <= 500) {
-        alert("🎉 We reached the college safely\nWELCOME TO ADITYA UNIVERSITY");
-    }
+/*<ul id="studentPickupList" style="list-style:none;padding:0;"></ul>*/
+
+
+/* ---------------- START ---------------- */
+loadPickup();
+loadLocation();
+setInterval(loadLocation, 5000);
+
+</script>
+<hr style="margin:20px 0;">
+<hr style="margin:20px 0;">
+<h3>📦 Bus Pickup Order</h3>
+<div id="busStatus" style="margin-bottom:12px;"></div>
+<ul id="studentPickupList" style="list-style:none;padding:0;"></ul>
+<script>
+function loadStudentPickupOrder() {
+
+    fetch("/student/pickup_order")
+        .then(r => r.json())
+        .then(data => {
+
+            const ul = document.getElementById("studentPickupList");
+            const statusBox = document.getElementById("busStatus");
+
+            ul.innerHTML = "";
+
+            // DRIVER STARTED
+            statusBox.innerHTML = `
+              <div style="
+                padding:10px;
+                border-radius:8px;
+                margin-bottom:10px;
+                background:#020617;
+                border-left:6px solid ${data.driver_started ? "#22c55e" : "#facc15"};
+              ">
+                🚍 Driver Started :
+                <b style="color:${data.driver_started ? "#22c55e" : "#facc15"}">
+                  ${data.driver_started ? "YES" : "NO"}
+                </b>
+                <br>
+                🏫 College Reached :
+                <b style="color:${data.college_reached ? "#22c55e" : "#f87171"}">
+                  ${data.college_reached ? "YES" : "NO"}
+                </b>
+              </div>
+            `;
+
+            data.pickups.forEach(p => {
+
+                let color = "#facc15";
+                if (p.status === "Approaching") color = "#38bdf8";
+                if (p.status === "Reached") color = "#22c55e";
+
+                let glow = p.is_me
+                    ? "0 0 12px #22c55e"
+                    : "none";
+
+                let border = p.is_me
+                    ? "6px solid #22c55e"
+                    : `6px solid ${color}`;
+
+                ul.innerHTML += `
+                  <li style="
+                    margin-bottom:10px;
+                    padding:12px;
+                    border-radius:10px;
+                    background:#020617;
+                    border-left:${border};
+                    box-shadow:${glow};
+                  ">
+                    <b>
+                      ${p.is_me ? "⭐ MY PICKUP — " : ""}${p.name}
+                    </b><br>
+                    ${p.distance} m —
+                    <span style="color:${color};font-weight:bold;">
+                      ${p.status}
+                    </span>
+                  </li>
+                `;
+            });
+        });
 }
 
-setInterval(() => {
-    loadLocation();
-    drawRoute();
-}, 5000);
+setInterval(loadStudentPickupOrder, 5000);
+loadStudentPickupOrder();
 </script>
+<hr style="margin:20px 0;">
+
+<h3>📦 Bus Pickup Order</h3>
+
+<div id="busStatus" style="margin-bottom:12px;"></div>
+
+<ul id="studentPickupList" style="list-style:none;padding:0;"></ul>
+<button onclick="callDriver()"
+        style="
+          margin-top:12px;
+          padding:12px 16px;
+          background:#16a34a;
+          color:white;
+          border:none;
+          border-radius:10px;
+          font-size:16px;
+          cursor:pointer;
+        ">
+    📞 Call Driver
+</button>
+
+<script>
+function callDriver() {
+
+    fetch("/student/driver_contact")
+        .then(r => r.json())
+        .then(d => {
+
+            if (!d.phone) {
+                alert("❌ Driver number not available");
+                return;
+            }
+
+            if (confirm(`Call driver of Bus ${d.bus}?`)) {
+                window.location.href = `tel:${d.phone}`;
+            }
+        })
+        .catch(() => alert("❌ Unable to contact driver"));
+}
+</script>
+
+
+
+
+
+<button onclick="openMissedBusPanel()"
+        style="
+          padding:12px 18px;
+          background:#dc2626;
+          color:white;
+          border:none;
+          border-radius:8px;
+          font-weight:bold;
+          cursor:pointer;
+        ">
+    ❌ I Missed My Bus
+</button>
+<div id="missedBusPanel"
+     style="
+       display:none;
+       margin-top:20px;
+       background:#020617;
+       border-radius:12px;
+       padding:16px;
+       border-left:6px solid #38bdf8;
+     ">
+
+  <h3>🚌 Nearby Buses (within 30 km)</h3>
+
+  <p style="color:#94a3b8;">
+    These buses are active and have not crossed your pickup point.
+    This is valid for <b>today only</b>.
+  </p>
+
+  <ul id="missedBusList" style="list-style:none;padding:0;"></ul>
+</div>
+<script>
+function openMissedBusPanel() {
+
+    const panel = document.getElementById("missedBusPanel");
+    const ul = document.getElementById("missedBusList");
+
+    panel.style.display = "block";
+    ul.innerHTML = "<li style='color:#facc15;'>⏳ Loading nearby buses...</li>";
+
+    fetch("/student/missed/nearby-buses")
+
+        .then(r => r.json())
+        .then(buses => {
+
+            ul.innerHTML = "";
+
+            if (!buses || buses.length === 0) {
+                ul.innerHTML = `
+                  <li style="color:#f87171;">
+                    ❌ No suitable nearby buses found
+                  </li>`;
+                return;
+            }
+
+            buses.forEach(b => {
+                ul.innerHTML += `
+                  <li style="
+                    margin-bottom:12px;
+                    padding:12px;
+                    border-radius:10px;
+                    background:#020617;
+                    border-left:6px solid #22c55e;
+                  ">
+                    <b>🚌 Bus ${b.bus_number}</b><br>
+                    📍 Distance: ${(b.distance / 1000).toFixed(1)} km
+
+                    <br><br>
+
+                    <button onclick="assignTempBus(${b.bus_id})"
+                        style="
+                          padding:8px 14px;
+                          background:#22c55e;
+                          color:black;
+                          border:none;
+                          border-radius:8px;
+                          font-weight:bold;
+                          cursor:pointer;
+                        ">
+                      ✅ Use This Bus Today
+                    </button>
+                  </li>
+                `;
+            });
+        })
+        .catch(() => {
+            ul.innerHTML = `
+              <li style="color:#f87171;">
+                ❌ Failed to load nearby buses
+              </li>`;
+        });
+}
+</script>
+<script>
+function assignTempBus(busId) {
+
+    if (!confirm("Use this bus for TODAY only?")) return;
+
+    window.location.href = `/student/missed/assign-bus/${busId}`;
+
+}
+</script>
+
+
+{% if missed_bus %}
+<hr style="margin:20px 0;">
+
+<h3>🚌 Nearby Buses (Temporary – Today Only)</h3>
+
+<div id="nearbyBusBox"
+     style="
+       background:#020617;
+       border-radius:12px;
+       padding:12px;
+       border-left:6px solid #38bdf8;
+     ">
+  <p style="color:#94a3b8;">
+    If you missed your bus, you can board another nearby bus for <b>today only</b>.
+  </p>
+
+  <ul id="nearbyBusList" style="list-style:none;padding:0;"></ul>
+</div>
+
+<script>
+function loadNearbyBuses() {
+
+    fetch("/student/nearby_buses")
+        .then(r => r.json())
+        .then(buses => {
+
+            const ul = document.getElementById("nearbyBusList");
+            ul.innerHTML = "";
+
+            if (buses.length === 0) {
+                ul.innerHTML = `
+                  <li style="color:#f87171;">
+                    ❌ No nearby buses available right now
+                  </li>`;
+                return;
+            }
+
+            buses.forEach(b => {
+                ul.innerHTML += `
+                  <li style="
+                    margin-bottom:12px;
+                    padding:12px;
+                    border-radius:10px;
+                    background:#020617;
+                    border-left:6px solid #22c55e;
+                  ">
+                    <b>🚌 Bus ${b.bus_number}</b><br>
+                    📍 Distance: ${(b.distance/1000).toFixed(1)} km
+
+                    <br><br>
+
+                    <button onclick="assignTempBus(${b.bus_id})"
+                        style="
+                          padding:8px 14px;
+                          background:#22c55e;
+                          color:black;
+                          border:none;
+                          border-radius:8px;
+                          font-weight:bold;
+                          cursor:pointer;
+                        ">
+                      ✅ Use This Bus Today
+                    </button>
+                  </li>
+                `;
+            });
+        });
+}
+
+function assignTempBus(busId) {
+
+    if (!confirm("Use this bus for TODAY only?")) return;
+
+    window.location.href = `/student/assign_temp_bus/${busId}`;
+}
+
+loadNearbyBuses();
+</script>
+
+
+
+{% endif %}
+
+
+
+
+{% endif %}
 
 </body>
 </html>
-
-

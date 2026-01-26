@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Admin Data{% endblock %}
+
+{% block content %}
+<div class="glass-page">
+
+  <div class="glass-card wide">
+
+    <!-- HEADER -->
+    <div class="glass-header">
+      <div class="icon-circle">
+        <span class="material-symbols-outlined">storage</span>
+      </div>
+      <h2>System Data</h2>
+      <p class="sub-text">Manage users and buses</p>
+    </div>
+
+    <!-- SEARCH -->
+    <form method="GET" action="{{ url_for('admin_data') }}" class="data-search">
+    <select name="role">
+        <option value="">All Roles</option>
+        <option value="student">Student</option>
+        <option value="driver">Driver</option>
+        <option value="admin">Admin</option>
+    </select>
+
+    <input type="text" name="search" placeholder="Search by username or email">
+
+    <button type="submit">🔍 Search</button>
+</form>
+
+    <!-- USERS -->
+    <h3 class="section-title blue">Users</h3>
+    <div class="table-wrapper">
+      <table class="glass-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.username }}</td>
+            <td>{{ u.email }}</td>
+            <td>
+              <span class="role {{ u.role }}">{{ u.role }}</span>
+            </td>
+            <td>
+              <form method="POST"
+                    action="{{ url_for('delete_user', user_id=u.id) }}"
+                    onsubmit="return confirm('Delete this user?')">
+                <button class="danger-btn">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- BUSES -->
+    <h3 class="section-title green">Buses</h3>
+    <div class="table-wrapper">
+      <table class="glass-table">
+        <thead>
+          <tr>
+            <th>Bus No</th>
+            <th>Route</th>
+            <th>Driver</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in buses %}
+          <tr>
+            <td>{{ b.bus_number }}</td>
+            <td>{{ b.route }}</td>
+            <td>{{ b.driver_name or "Unassigned" }}</td>
+            <td>
+              <form method="POST"
+                    action="{{ url_for('admin_delete_bus', bus_id=b.id) }}"
+                    onsubmit="return confirm('Delete this bus?')">
+                <button class="danger-btn">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

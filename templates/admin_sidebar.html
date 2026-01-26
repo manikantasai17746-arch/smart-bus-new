@@ -1,0 +1,56 @@
+{% include "admin_sidebar.html" %}
+
+<div class="menu">
+    <ul class="menu-content">
+
+        <li>
+            <a href="{{ url_for('admin_dashboard') }}">
+                <span class="material-symbols-outlined">dashboard</span>
+                <span>Admin Dashboard</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="{{ url_for('add_bus') }}">
+                <span class="material-symbols-outlined">directions_bus</span>
+                <span>Add Bus</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="{{ url_for('admin_add_driver') }}">
+                <span class="material-symbols-outlined">person_add</span>
+                <span>Add Driver</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="{{ url_for('admin_complaints') }}">
+                <span class="material-symbols-outlined">report_problem</span>
+                <span>Complaints</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="{{ url_for('profile') }}">
+                <span class="material-symbols-outlined">account_circle</span>
+                <span>Profile</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="#">
+                <span class="material-symbols-outlined">storage</span>
+                <span>Data</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="{{ url_for('logout') }}">
+                <span class="material-symbols-outlined">logout</span>
+                <span>Logout</span>
+            </a>
+        </li>
+
+    </ul>
+</div>

@@ -1,0 +1,23 @@
+<h2>🚌 Nearby Buses (Today Only)</h2>
+<ul id="busList"></ul>
+
+<script>
+fetch("/student/nearby_buses_api")
+.then(r => r.json())
+.then(buses => {
+  const ul = document.getElementById("busList");
+
+  buses.forEach(b => {
+    ul.innerHTML += `
+      <li>
+        Bus ${b.bus_number} – ${(b.distance/1000).toFixed(1)} km
+        <button onclick="useBus(${b.bus_id})">Use Today</button>
+      </li>
+    `;
+  });
+});
+
+function useBus(busId){
+  window.location.href = `/student/assign_temp_bus/${busId}`;
+}
+</script>
