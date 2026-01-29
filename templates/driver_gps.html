@@ -44,56 +44,56 @@
 </head>
 
 <body>
-
 {% include "navbar.html" %}
 
-
-
-
-
 <div class="page-content">
+
     <h2>🚍 Driver Live GPS</h2>
 
-    
+    <div class="driver-controls">
+    <button onclick="startTracking()" class="control-btn start-btn">
+        ▶ Start Sharing Location
+    </button>
 
-    <button onclick="startTracking()">▶ Start Sharing Location</button>
-    <button onclick="stopTracking()">⏹ Stop</button>
+    <button onclick="stopTracking()" class="control-btn stop-btn">
+        ■ Stop
+    </button>
+</div>
 
+
+    <!-- MAP (ONLY ONE) -->
     <div id="map"></div>
+
+    <!-- DRIVER STATS -->
     <div class="driver-stats">
-    <div class="driver-stat-card driver-stat-speed">
-        🚗 Speed<br>
-        <b><span id="driverSpeed">0</span> km/h</b>
+        <div class="driver-stat-card driver-stat-speed">
+            🚗 Speed<br>
+            <b><span id="driverSpeed">0</span> km/h</b>
+        </div>
+
+        <div class="driver-stat-card driver-stat-distance">
+            📏 Distance<br>
+            <b><span id="driverDistance">--</span></b>
+        </div>
+
+        <div class="driver-stat-card driver-stat-eta">
+            ⏱ ETA<br>
+            <b><span id="driverETA">--</span> min</b>
+        </div>
     </div>
 
-    <div class="driver-stat-card driver-stat-distance">
-        📏 Distance<br>
-        <b><span id="driverDistance">--</span></b>
+    <!-- PICKUP PANEL (MOVED INSIDE) -->
+    <div id="pickup-panel">
+        <h3>📦 Pickup Order</h3>
+        <ul id="pickupList" style="list-style:none;padding:0;"></ul>
     </div>
 
-    <div class="driver-stat-card driver-stat-eta">
-        ⏱ ETA<br>
-        <b><span id="driverETA">--</span> min</b>
-    </div>
-</div>
+    <!-- SOS BUTTON (MOVED INSIDE) -->
+    <button onclick="sendSOS()" class="sos-btn">
+        🚨 SOS
+    </button>
 
 </div>
- <div id="pickup-panel" style="
-      margin-top:15px;
-      background:#0f172a;   
-          border-radius:12px;
-          padding:12px;
-          ">
-  <h3>📦 Pickup Order</h3>
-  <ul id="pickupList" style="list-style:none;padding:0;"></ul>
-</div>
-
-
-<div id="map"></div>
-
-<button onclick="sendSOS()" class="sos-btn">
-    🚨 SOS
-</button>
 
 
 

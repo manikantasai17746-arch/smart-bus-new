@@ -2,130 +2,217 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title> / Contact Admin</title>
+    <title>Report / Contact Admin</title>
 
-    <!-- ✅ REQUIRED FOR NAVBAR ICONS -->
+    <!-- Icons -->
     <link rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
 
-    <!-- Sidebar / Menu CSS -->
+    <!-- Sidebar -->
     <link rel="stylesheet" href="{{ url_for('static', filename='menu.css') }}">
 
     <style>
-        .report-container {
-            margin-left: 120px;
+        body {
+            background: #020617;
+        }
+
+        .page-content {
+            margin-left: 70px;
             padding: 30px;
-            color: white;
+            color: #e5e7eb;
+            transition: margin-left 0.3s ease;
         }
 
-        .report-card {
-            background: rgba(0,0,0,0.35);
-            border-radius: 15px;
-            padding: 25px;
-            max-width: 700px;
+        body.menu-open .page-content {
+            margin-left: 220px;
         }
 
-        .report-card h2 {
-            color: #4fc3f7;
+        .report-wrapper {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        /* ===== CARD WITH GREEN GLOW ===== */
+        .card {
+            position: relative;
+            background: #020617;
+            border-radius: 14px;
+            padding: 22px;
             margin-bottom: 20px;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,0.05),
+                0 10px 30px rgba(0,0,0,0.6);
         }
 
-        .admin-info p {
-            margin: 6px 0;
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            pointer-events: none;
+            box-shadow:
+                0 0 0 1px rgba(34,197,94,0.25),
+                0 0 25px rgba(34,197,94,0.08);
+            opacity: 0.6;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+            box-shadow:
+                0 0 0 1px rgba(34,197,94,0.6),
+                0 0 40px rgba(34,197,94,0.25);
+        }
+
+        .card h2,
+        .card h3 {
+            margin-top: 0;
+            color: #22c55e;
+        }
+
+       .info-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+
+        .info-grid div {
+            background: rgba(255,255,255,0.06);
+            padding: 10px;
+            border-radius: 8px;
         }
 
         .contact-box {
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.06);
             padding: 10px;
             border-radius: 8px;
-            margin: 8px 0;
+            margin-bottom: 8px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            background: #020617;
+            color: white;
+            outline: none;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+        }
+
+        input:focus,
+        textarea:focus {
+            box-shadow:
+                inset 0 0 0 1px rgba(34,197,94,0.9),
+                0 0 0 3px rgba(34,197,94,0.25);
         }
 
         textarea {
-            width: 100%;
-            height: 120px;
-            border-radius: 10px;
-            padding: 10px;
-            border: none;
-            outline: none;
-            margin-top: 10px;
+            resize: none;
+            height: 130px;
         }
 
-        button {
-            margin-top: 15px;
-            background: #29b6f6;
+        .btn {
+            margin-top: 14px;
+            padding: 12px 18px;
+            border-radius: 10px;
             border: none;
-            padding: 10px 25px;
-            border-radius: 25px;
-            color: white;
-            font-size: 16px;
+            font-size: 15px;
+            font-weight: 600;
             cursor: pointer;
         }
 
-        button:hover {
-            background: #0288d1;
+        .btn-primary {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #020617;
+        }
+
+        .btn-primary:hover {
+            box-shadow:
+                0 0 0 1px rgba(34,197,94,0.6),
+                0 10px 30px rgba(34,197,94,0.4);
+            transform: translateY(-1px);
+        }
+
+        .muted {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page-content {
+                margin-left: 60px;
+            }
         }
     </style>
 </head>
 
 <body>
-    
 
 {% include "navbar.html" %}
 
-<div class="report-container">
-    <div class="report-card">
+<div class="page-content">
+    <div class="report-wrapper">
 
-        <h2>📢 Report Issue / Contact Admin</h2>
+        <!-- ADMIN INFO -->
+        <div class="card">
+            <h2>📢 Contact Admin</h2>
 
-        {% if admin %}
-        <div class="admin-info">
-            <p><b>Office:</b> ADITYA UNIVERSITY </p>
-            <p><b>Admin Name:</b> { MANIKANTA}</p>
-            <p><b>Email:</b> manikantasai218@gmail.com </p>
+            {% if admin %}
+            <div class="info-grid">
+                <div><b>Admin:</b> {{ admin.admin_name }}</div>
+                <div><b>College:</b> {{ admin.college_name }}</div>
+                <div><b>Email:</b> {{ admin.email }}</div>
+            </div>
+            {% else %}
+            <p class="muted">❌ Admin information not available</p>
+            {% endif %}
         </div>
 
-        <h3 style="margin-top:20px;">📞 Contact Numbers</h3>
-
-        {% for c in contacts %}
-        <div class="contact-box">
-            {{ c.phone }}
+        <!-- CONTACT NUMBERS -->
+        {% if contacts %}
+        <div class="card">
+            <h3>📞 Contact Numbers</h3>
+            {% for c in contacts %}
+            <div class="contact-box">
+                {{ c.phone }}
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-
-        <h3 style="margin-top:25px;">📝 Report an Issue</h3>
-
-        <form action="{{ url_for('submit_complaint') }}" method="post">
-
-    <input
-        type="text"
-        name="subject"
-        placeholder="Complaint Subject"
-        required
-        style="width:100%; padding:10px; border-radius:8px;"
-    >
-
-    <br><br>
-
-    <textarea
-        name="message"
-        placeholder="Describe your issue..."
-        required
-        style="width:100%; height:120px; border-radius:10px; padding:10px;"
-    ></textarea>
-
-    <br><br>
-
-    <button type="submit" class="btn btn-primary">
-        🚨 Submit Complaint
-    </button>
-</form>
-
-                      
-
-        {% else %}
-        <p>❌ Admin information not available</p>
         {% endif %}
+
+        <!-- COMPLAINT FORM -->
+        <div class="card">
+            <h3>📝 Report an Issue</h3>
+            <p class="muted">
+                Describe your issue clearly. The admin will review it.
+            </p>
+
+            <form action="{{ url_for('submit_complaint') }}" method="post">
+                <input
+                    type="text"
+                    name="subject"
+                    placeholder="Complaint Subject"
+                    required
+                >
+
+                <br><br>
+
+                <textarea
+                    name="message"
+                    placeholder="Describe your issue..."
+                    required
+                ></textarea>
+
+                <button type="submit" class="btn btn-primary">
+                    🚨 Submit Complaint
+                </button>
+            </form>
+        </div>
 
     </div>
 </div>

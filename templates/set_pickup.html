@@ -1,28 +1,151 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>📍 Select Pickup Point</h2>
+<div class="page-content">
+    <h2>📍 Select Pickup Point</h2>
+    <p class="pickup-subtext">
+        Click on the map to choose your exact pickup location.
+    </p>
 
-<form method="POST">
-    <label>Pickup Location Name</label><br>
-    <input type="text" name="pickup_name" required><br><br>
+    <div class="pickup-layout">
+        <!-- FORM CARD -->
+        <div class="pickup-card">
+            <h3>📝 Pickup Details</h3>
 
-    <label>Latitude</label><br>
-    <input type="text" id="lat" name="latitude" readonly required><br><br>
+            <form method="POST">
+                <label>Pickup Location Name</label>
+                <input type="text" name="pickup_name" placeholder="Eg: Main Gate, Hostel" required>
 
-    <label>Longitude</label><br>
-    <input type="text" id="lng" name="longitude" readonly required><br><br>
+                <label>Latitude</label>
+                <input type="text" id="lat" name="latitude" readonly required>
 
-    <div id="map" style="height: 400px;"></div><br>
+                <label>Longitude</label>
+                <input type="text" id="lng" name="longitude" readonly required>
 
-    <button type="submit">✅ Save Pickup Point</button>
-</form>
+                <button type="submit" class="save-btn">
+                    ✅ Save Pickup Point
+                </button>
+            </form>
 
+            <div class="hint">
+                📌 Tip: Zoom in and tap precisely where you will stand.
+            </div>
+        </div>
+
+        <!-- MAP CARD -->
+        <div class="map-card">
+            <div id="map"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= STYLES ================= -->
+<style>
+.pickup-subtext {
+    color: #94a3b8;
+    margin-bottom: 18px;
+    font-size: 14px;
+}
+
+/* Layout */
+.pickup-layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 20px;
+}
+
+/* Cards */
+.pickup-card,
+.map-card {
+    background: linear-gradient(180deg, #020617, #020617);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,0.05),
+        0 10px 30px rgba(0,0,0,0.6);
+}
+
+/* Form */
+.pickup-card h3 {
+    margin-top: 0;
+    margin-bottom: 14px;
+    color: #e5e7eb;
+}
+
+.pickup-card label {
+    font-size: 13px;
+    color: #94a3b8;
+    display: block;
+    margin-bottom: 6px;
+}
+
+.pickup-card input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: #020617;
+    color: white;
+    outline: none;
+    margin-bottom: 14px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+.pickup-card input::placeholder {
+    color: #64748b;
+}
+
+/* Button */
+.save-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    color: #052e16;
+    box-shadow: 0 10px 25px rgba(34,197,94,0.45);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.save-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(34,197,94,0.6);
+}
+
+/* Hint */
+.hint {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #38bdf8;
+}
+
+/* Map */
+#map {
+    width: 100%;
+    height: 420px;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+    .pickup-layout {
+        grid-template-columns: 1fr;
+    }
+
+    #map {
+        height: 360px;
+    }
+}
+</style>
+
+<!-- ================= MAP (UNCHANGED LOGIC) ================= -->
 <link
   rel="stylesheet"
   href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
 />
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>

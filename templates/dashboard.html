@@ -8,10 +8,11 @@
 
     <hr>
 
-    <!-- 🚍 BUS STATUS -->
+    {% if session.get("role") == "student" %}
+    <!-- ================= STUDENT DASHBOARD ================= -->
+
     <h3 id="busStatus">Loading bus status...</h3>
 
-    <!-- STEPPER -->
     <div class="stepper">
         <div class="step" id="step-far">
             <div class="circle"></div>
@@ -46,9 +47,37 @@
             <span>Arrived to College</span>
         </div>
     </div>
+
+    {% elif session.get("role") == "driver" %}
+    <!-- ================= DRIVER DASHBOARD ================= -->
+
+    <div class="driver-dashboard">
+        <div class="driver-card primary">
+            <h3>🚍 Driver Control Panel</h3>
+            <p>
+                Start live GPS tracking to share your location with students
+                and follow the pickup order.
+            </p>
+
+            <a href="{{ url_for('driver_gps') }}" class="driver-btn">
+                ▶ Open Live GPS
+            </a>
+        </div>
+
+        <div class="driver-card info">
+            <h4>📌 Today’s Instructions</h4>
+            <ul>
+                <li>Start GPS before moving</li>
+                <li>Follow pickup order shown in GPS</li>
+                <li>Use SOS only in emergency</li>
+            </ul>
+        </div>
+    </div>
+
+    {% endif %}
 </div>
 
-<!-- 🎨 STYLE -->
+<!-- ================= STUDENT STYLE (KEEP) ================= -->
 <style>
 .stepper {
     display: flex;
@@ -56,7 +85,6 @@
     justify-content: center;
     margin-top: 30px;
 }
-
 .step {
     display: flex;
     flex-direction: column;
@@ -64,7 +92,6 @@
     font-size: 13px;
     color: #999;
 }
-
 .circle {
     width: 18px;
     height: 18px;
@@ -72,64 +99,109 @@
     background: #bbb;
     margin-bottom: 6px;
 }
-
 .line {
     width: 50px;
     height: 3px;
     background: #ccc;
     margin: 0 6px;
 }
-
 .step.active .circle {
     background: #28a745;
 }
-
 .step.active span {
     color: #28a745;
     font-weight: bold;
 }
+
+/* ================= DRIVER DASHBOARD STYLE ================= */
+
+.driver-dashboard {
+    max-width: 720px;
+    display: grid;
+    gap: 18px;
+}
+
+.driver-card {
+    background: linear-gradient(180deg, #020617, #020617);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,0.05),
+        0 10px 30px rgba(0,0,0,0.6);
+}
+
+.driver-card.primary {
+    border-left: 6px solid #22c55e;
+}
+
+.driver-card.info {
+    border-left: 6px solid #38bdf8;
+}
+
+.driver-card h3,
+.driver-card h4 {
+    margin-top: 0;
+    color: #e5e7eb;
+}
+
+.driver-card p,
+.driver-card li {
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.driver-card ul {
+    padding-left: 18px;
+    margin: 10px 0 0;
+}
+
+.driver-btn {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #16a34a, #22c55e);
+    color: #052e16;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 10px 25px rgba(34,197,94,0.45);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.driver-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(34,197,94,0.6);
+}
 </style>
 
-<!-- 🧠 SCRIPT -->
+<!-- ================= STUDENT SCRIPT ONLY ================= -->
+{% if session.get("role") == "student" %}
 <script>
 async function loadBusStatus() {
     const res = await fetch("/student/bus_status");
     const data = await res.json();
-
     if (!data.status) return;
-
     document.getElementById("busStatus").innerText =
         `Bus is ${data.status} (${data.distance_m} m)`;
-
     updateStepper(data.status);
 }
-
 function updateStepper(status) {
-    // reset
     document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
-
     if (status === "Arrived to College") {
         activate(["step-far","step-way","step-approaching","step-arrived","step-college"]);
-    }
-    else if (status === "Arrived") {
+    } else if (status === "Arrived") {
         activate(["step-far","step-way","step-approaching","step-arrived"]);
-    }
-    else if (status === "Approaching") {
+    } else if (status === "Approaching") {
         activate(["step-far","step-way","step-approaching"]);
-    }
-    else {
+    } else {
         activate(["step-far","step-way"]);
     }
 }
-
 function activate(ids) {
-    ids.forEach(id => {
-        document.getElementById(id).classList.add("active");
-    });
+    ids.forEach(id => document.getElementById(id)?.classList.add("active"));
 }
-
 loadBusStatus();
 setInterval(loadBusStatus, 5000);
 </script>
+{% endif %}
 
 {% endblock %}

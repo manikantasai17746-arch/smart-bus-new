@@ -25,88 +25,92 @@
     </style>
 </head>
 
-<body>
+<body>{% include "navbar.html" %}
 
-{% include "navbar.html" %}
-
-<div class="main-content">
+<div class="page-content mybus-page">
     <h2>🚍 My Bus (Live Tracking)</h2>
+
     {% if not bus %}
+    <!-- ASSIGN BUS -->
+    <div class="card">
+        <h3>🚌 Assign Your Bus</h3>
+        <p class="muted">You must assign a bus before using tracking.</p>
 
-<div style="
-    margin-top:30px;
-    padding:20px;
-    border-radius:12px;
-    background:#020617;
-    border-left:6px solid #22c55e;
-">
-    <h3>🚌 Assign Your Bus</h3>
-    <p>You must assign a bus before using tracking.</p>
+        <form method="POST">
+            <input type="text" name="bus_number"
+                   placeholder="Enter Bus Number"
+                   required
+                   style="width:100%;padding:12px;border-radius:10px;border:none;margin-bottom:12px;">
+            <button class="btn-primary full">✅ Assign Bus</button>
+        </form>
+    </div>
 
-    <form method="POST">
-        <input
-            type="text"
-            name="bus_number"
-            placeholder="Enter Bus Number"
-            required
-            style="
-                width:100%;
-                padding:12px;
-                border-radius:8px;
-                border:none;
-                margin-bottom:12px;
-            "
-        >
-        <button style="
-            width:100%;
-            padding:12px;
-            background:#22c55e;
-            color:black;
-            border:none;
-            border-radius:8px;
-            font-weight:bold;
-        ">
-            ✅ Assign Bus
-        </button>
-    </form>
-</div>
+    {% else %}
 
-{% else %}
+    <!-- BUS INFO -->
+    <div class="card info-grid">
+        <div><b>Bus:</b> {{ bus.bus_number }}</div>
+        <div><b>Reg No:</b> {{ bus.registration_number }}</div>
+        <div><b>Driver:</b> {{ bus.driver_name }}</div>
+        <div><b>Route:</b> {{ bus.route }}</div>
+    </div>
 
-
-    {% if bus %}
-        <p><b>Bus Number:</b> {{ bus.bus_number }}</p>
-        <p><b>Registration:</b> {{ bus.registration_number }}</p>
-        <p><b>Driver:</b> {{ bus.driver_name }}</p>
-        <p><b>Route:</b> {{ bus.route }}</p>
-
+    <!-- MAP -->
+    <div class="card">
         <div id="map"></div>
 
         {% if session.get("role") == "student" %}
+        <div class="pickup-actions">
             {% if pickup is none %}
-                <a href="{{ url_for('set_pickup') }}"
-                   style="margin-top:15px;display:inline-block;
-                          padding:10px 15px;background:#28a745;
-                          color:white;border-radius:6px;text-decoration:none;">
+                <a href="{{ url_for('set_pickup') }}" class="btn-green">
                     📍 Set Pickup Point
                 </a>
             {% else %}
-                <a href="{{ url_for('set_pickup') }}"
-                   style="margin-top:15px;display:inline-block;
-                          padding:10px 15px;background:#ffc107;
-                          color:black;border-radius:6px;text-decoration:none;">
+                <a href="{{ url_for('set_pickup') }}" class="btn-yellow">
                     🔁 Update Pickup Point
                 </a>
             {% endif %}
+        </div>
         {% endif %}
 
-        <p id="distanceText"
-           style="margin-top:10px;color:yellow;font-weight:bold;"></p>
+        <p id="distanceText" class="distance-text"></p>
+    </div>
 
-    {% else %}
-        <p style="color:red;">❌ No bus assigned</p>
+    <!-- PICKUP ORDER -->
+    <div class="card">
+        <h3>📦 Bus Pickup Order</h3>
+        <div id="busStatus"></div>
+        <ul id="studentPickupList"></ul>
+    </div>
+
+    <!-- CALL DRIVER -->
+    {% if session.get("role") == "student" %}
+    <div class="card">
+        <button onclick="callDriver()" class="btn-primary full">
+            📞 Call Driver
+        </button>
+    </div>
+    {% endif %}
+
+    <!-- MISSED BUS -->
+    {% if session.get("role") == "student" %}
+    <div class="card danger">
+        <button onclick="openMissedBusPanel()" class="btn-danger full">
+            ❌ I Missed My Bus
+        </button>
+
+        <div id="missedBusPanel" style="display:none;margin-top:12px;">
+            <h3>🚌 Nearby Buses</h3>
+            <p class="muted">Valid for today only</p>
+            <ul id="missedBusList"></ul>
+        </div>
+    </div>
+    {% endif %}
+
     {% endif %}
 </div>
+
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
@@ -272,9 +276,7 @@ loadLocation();
 setInterval(loadLocation, 5000);
 
 </script>
-<hr style="margin:20px 0;">
-<hr style="margin:20px 0;">
-<h3>📦 Bus Pickup Order</h3>
+
 <div id="busStatus" style="margin-bottom:12px;"></div>
 <ul id="studentPickupList" style="list-style:none;padding:0;"></ul>
 <script>
@@ -349,63 +351,6 @@ function loadStudentPickupOrder() {
 setInterval(loadStudentPickupOrder, 5000);
 loadStudentPickupOrder();
 </script>
-<hr style="margin:20px 0;">
-
-<h3>📦 Bus Pickup Order</h3>
-
-<div id="busStatus" style="margin-bottom:12px;"></div>
-
-<ul id="studentPickupList" style="list-style:none;padding:0;"></ul>
-<button onclick="callDriver()"
-        style="
-          margin-top:12px;
-          padding:12px 16px;
-          background:#16a34a;
-          color:white;
-          border:none;
-          border-radius:10px;
-          font-size:16px;
-          cursor:pointer;
-        ">
-    📞 Call Driver
-</button>
-
-<script>
-function callDriver() {
-
-    fetch("/student/driver_contact")
-        .then(r => r.json())
-        .then(d => {
-
-            if (!d.phone) {
-                alert("❌ Driver number not available");
-                return;
-            }
-
-            if (confirm(`Call driver of Bus ${d.bus}?`)) {
-                window.location.href = `tel:${d.phone}`;
-            }
-        })
-        .catch(() => alert("❌ Unable to contact driver"));
-}
-</script>
-
-
-
-
-
-<button onclick="openMissedBusPanel()"
-        style="
-          padding:12px 18px;
-          background:#dc2626;
-          color:white;
-          border:none;
-          border-radius:8px;
-          font-weight:bold;
-          cursor:pointer;
-        ">
-    ❌ I Missed My Bus
-</button>
 <div id="missedBusPanel"
      style="
        display:none;
@@ -517,6 +462,7 @@ function assignTempBus(busId) {
   <ul id="nearbyBusList" style="list-style:none;padding:0;"></ul>
 </div>
 
+
 <script>
 function loadNearbyBuses() {
 
@@ -579,7 +525,6 @@ loadNearbyBuses();
 
 
 
-{% endif %}
 
 
 
