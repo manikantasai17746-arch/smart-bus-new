@@ -36,10 +36,27 @@
             cursor: pointer;
         }
         #map {
-            height: 500px;
-            width: 100%;
-            border-radius: 10px;
-        }
+    width: 100%;
+    height: 55vh;
+    min-height: 320px;
+    max-height: 420px;
+
+    border-radius: 14px;
+    border: 2px solid #1e293b;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.05);
+
+    margin-top: 12px;
+    overflow: hidden;
+}
+
+/* Mobile fix */
+@media (max-width: 768px) {
+    #map {
+        height: 300px;
+        min-height: unset;
+    }
+}
+
     </style>
 </head>
 
@@ -99,42 +116,7 @@
 
 
 <script>
-  function loadPickupOrder() {
-
-    fetch("/driver/pickup_order")
-        .then(r => r.json())
-        .then(list => {
-
-            const ul = document.getElementById("pickupList");
-            ul.innerHTML = "";
-
-            list.forEach((p, i) => {
-
-                let color = "yellow";
-                if (p.status === "Reached") color = "lime";
-                if (p.status === "Approaching") color = "deepskyblue";
-
-                ul.innerHTML += `
-                    <li style="
-                        background:#111;
-                        padding:12px;
-                        margin-bottom:8px;
-                        border-radius:8px;
-                    ">
-                        <b>
-  ${i+1}. ${p.name}
-  ${p.is_temp ? "<span style='color:#facc15;'> (TEMP)</span>" : ""}
-</b>
-<br>
-                        📏 ${p.distance} m —
-                        <span style="color:${color};font-weight:bold;">
-                            ${p.status}
-                        </span>
-                    </li>
-                `;
-            });
-        });
-}
+  
 
 // AUTO UPDATE every 5 seconds
 setInterval(loadPickups, 5000); // every 5 seconds
@@ -158,6 +140,11 @@ const pickupIcon = L.icon({
 /* ================= MARKERS ================= */
 let driverMarker = L.marker([17.385, 78.4867]).addTo(map);
 let pickupMarkers = [];
+function clearPickupMarkers() {
+    pickupMarkers.forEach(m => map.removeLayer(m));
+    pickupMarkers = [];
+}
+
 
 /* ================= STATE ================= */
 let destinationLat = 17.089148;
@@ -182,40 +169,53 @@ const tempPickupIcon = L.icon({
 });
 
 function loadPickups() {
-    fetch("/driver/get_pickups")
+    fetch("/driver/ordered_pickups")
         .then(r => r.json())
         .then(points => {
 
             pickupsCache = points;
-
-            // 🔥 clear old markers first
             clearPickupMarkers();
 
             points.forEach(p => {
-
                 const iconToUse = p.is_temp ? tempPickupIcon : pickupIcon;
 
-                const m = L.marker([p.lat, p.lng], { icon: iconToUse })
+                const lat = p.lat ?? p.latitude ?? p.pickup_lat;
+                const lng = p.lng ?? p.longitude ?? p.pickup_lng;
+
+                if (lat === undefined || lng === undefined) {
+                    console.error("Invalid pickup coordinates:", p);
+                    return;
+                }
+
+                const m = L.marker([lat, lng], { icon: iconToUse })
                     .addTo(map)
                     .bindPopup(
-                        p.is_temp
-                            ? "🟡 TEMP PICKUP: " + p.name
-                            : "📍 PICKUP: " + p.name
+                        (p.is_temp ? "🟡 TEMP PICKUP: " : "📍 PICKUP: ") + p.name
                     );
 
                 pickupMarkers.push(m);
             });
-        });
+
+        })
+        .catch(err => console.error("Pickup load failed:", err));
 }
+
+
+
 
 /* ================= ROUTE ================= */
 function drawRoute(lat, lng) {
 
-    if (pickupsCache.length === 0) return;
-
     const waypoints = [
         L.latLng(lat, lng),
-        ...pickupsCache.map(p => L.latLng(p.lat, p.lng)),
+        ...pickupsCache
+    .map(p => {
+        const lat = p.lat ?? p.latitude ?? p.pickup_lat;
+        const lng = p.lng ?? p.longitude ?? p.pickup_lng;
+        return (lat && lng) ? L.latLng(lat, lng) : null;
+    })
+    .filter(Boolean),
+
         L.latLng(destinationLat, destinationLng)
     ];
 
@@ -229,7 +229,7 @@ function drawRoute(lat, lng) {
         draggableWaypoints: false,
         show: false,
         lineOptions: {
-            styles: [{ color: "blue", weight: 5 }]
+            styles: [{ color: "#38bdf8", weight: 5 }]
         }
     })
     .on("routesfound", e => {
@@ -241,6 +241,7 @@ function drawRoute(lat, lng) {
         document.getElementById("driverETA").innerText = minutes;
         document.getElementById("driverDistance").innerText = km + " km";
 
+        // optional backend sync
         fetch("/driver/update_eta", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -249,6 +250,7 @@ function drawRoute(lat, lng) {
     })
     .addTo(map);
 }
+
 
 /* ================= SPEED ================= */
 let lastPos = null;
@@ -344,6 +346,7 @@ function stopTracking() {
         alert("Tracking stopped");
     }
 }
+
 </script>
 <script>
 function sendSOS() {
@@ -386,16 +389,25 @@ function loadPickupOrder() {
         .then(data => {
 
             const ul = document.getElementById("pickupList");
+            if (!ul) return;
+
             ul.innerHTML = "";
+
+            if (data.length === 0) {
+                ul.innerHTML = `
+                    <li style="color:#94a3b8;padding:10px;">
+                        No pickups assigned yet
+                    </li>
+                `;
+                return;
+            }
 
             data.forEach(p => {
 
-                // STATUS COLOR
                 let statusColor = "#facc15"; // Pending
                 if (p.status === "Approaching") statusColor = "#38bdf8";
                 if (p.status === "Reached") statusColor = "#22c55e";
 
-                // TEMP UI
                 const isTemp = p.is_temp === true;
                 const bgColor = isTemp ? "#422006" : "#020617";
                 const borderColor = isTemp ? "#facc15" : statusColor;
@@ -419,12 +431,13 @@ function loadPickupOrder() {
                   </li>
                 `;
             });
-        });
+        })
+        .catch(err => console.error("Pickup order error:", err));
 }
-
-// auto update every 5 sec
-setInterval(loadPickupOrder, 5000);
 loadPickupOrder();
+setInterval(loadPickupOrder, 5000);
+
+
 </script>
 
 

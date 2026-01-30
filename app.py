@@ -10,6 +10,9 @@ from email.message import EmailMessage
 
 
 
+
+
+
 app = Flask(__name__)
 app.secret_key = "smart_bus_secret"
 COLLEGE_LAT = 17.089148
@@ -845,6 +848,7 @@ def student_get_location():
         return jsonify({})
 
     conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
 
     user = conn.execute("""
         SELECT bus_id, temp_bus_id, temp_bus_date
@@ -856,7 +860,7 @@ def student_get_location():
         conn.close()
         return jsonify({})
 
-    from datetime import date
+    from datetime import date, datetime, timezone, timedelta
     today = date.today().isoformat()
 
     # ✅ TEMP-AWARE BUS SELECTION
@@ -888,16 +892,21 @@ def student_get_location():
         return jsonify({"online": False})
 
     last_update = datetime.fromisoformat(row["updated_at"])
-    online = (datetime.utcnow() - last_update) <= timedelta(seconds=20)
+    last_update = last_update.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    age = int((now - last_update).total_seconds())
+
+    online = age <= 20
 
     return jsonify({
-        "latitude": row["latitude"] if online else None,
-        "longitude": row["longitude"] if online else None,
+        "latitude": float(row["latitude"]),
+        "longitude": float(row["longitude"]),
         "eta": eta_row["eta"] if eta_row else None,
         "online": online,
+        "age": age,
         "last_update": row["updated_at"]
     })
-
 
 
 
@@ -1543,15 +1552,18 @@ def driver_pickup_order():
 @app.route("/driver/ordered_pickups")
 def driver_ordered_pickups():
 
+    # 🔐 Only driver
     if session.get("role") != "driver":
         return jsonify([])
 
     conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
 
-    # 1️⃣ GET BUS ID FIRST
-    row = conn.execute("""
-        SELECT bus_id FROM users WHERE id = ?
-    """, (session["user_id"],)).fetchone()
+    # 1️⃣ Get bus_id
+    row = conn.execute(
+        "SELECT bus_id FROM users WHERE id=?",
+        (session["user_id"],)
+    ).fetchone()
 
     if not row or not row["bus_id"]:
         conn.close()
@@ -1559,63 +1571,101 @@ def driver_ordered_pickups():
 
     bus_id = row["bus_id"]
 
-    # 2️⃣ GET BUS LIVE LOCATION
-    bus_loc = conn.execute("""
-        SELECT latitude, longitude
-        FROM bus_location
-        WHERE bus_id = ?
-    """, (bus_id,)).fetchone()
+    # 2️⃣ Get live bus location
+    bus = conn.execute(
+        "SELECT latitude, longitude FROM bus_location WHERE bus_id=?",
+        (bus_id,)
+    ).fetchone()
 
-    if not bus_loc:
+    if not bus:
         conn.close()
         return jsonify([])
 
-    dlat = bus_loc["latitude"]
-    dlng = bus_loc["longitude"]
+    bus_lat = float(bus["latitude"])
+    bus_lng = float(bus["longitude"])
 
-    # 3️⃣ GET PICKUPS
+    # 3️⃣ Get pickup points
     pickups = conn.execute("""
-        SELECT pickup_name, latitude, longitude
+        SELECT
+            pickup_name,
+            latitude,
+            longitude,
+            pickup_reached,
+            is_temp
         FROM pickup_points
-        WHERE bus_id = ?
+        WHERE bus_id=?
     """, (bus_id,)).fetchall()
 
-    from math import radians, cos, sin, sqrt, atan2
-    R = 6371000
+    from math import radians, sin, cos, sqrt, atan2
+
+    def distance_m(lat1, lng1, lat2, lng2):
+        R = 6371000
+        dlat = radians(lat2 - lat1)
+        dlng = radians(lng2 - lng1)
+        a = (
+            sin(dlat / 2) ** 2 +
+            cos(radians(lat1)) *
+            cos(radians(lat2)) *
+            sin(dlng / 2) ** 2
+        )
+        return int(2 * R * atan2(sqrt(a), sqrt(1 - a)))
 
     result = []
 
     for p in pickups:
-        dlat_r = radians(p["latitude"] - dlat)
-        dlng_r = radians(p["longitude"] - dlng)
-
-        a = (
-            sin(dlat_r / 2) ** 2
-            + cos(radians(dlat))
-            * cos(radians(p["latitude"]))
-            * sin(dlng_r / 2) ** 2
+        d = distance_m(
+            bus_lat, bus_lng,
+            float(p["latitude"]),
+            float(p["longitude"])
         )
 
-        dist = int(2 * R * atan2(sqrt(a), sqrt(1 - a)))
-
-        if dist <= 50:
+        # 🔒 MONOTONIC STATUS (NO WRITES)
+        if p["pickup_reached"] == 1:
             status = "Reached"
-        elif dist <= 500:
+        elif d <= 500:
             status = "Approaching"
         else:
             status = "Pending"
 
         result.append({
             "name": p["pickup_name"],
-            "distance": dist,
-            "status": status
-            
+            "lat": p["latitude"],
+            "lng": p["longitude"],
+            "distance": d,
+            "status": status,
+            "is_temp": bool(p["is_temp"])
         })
 
     conn.close()
 
+    # nearest first
     result.sort(key=lambda x: x["distance"])
+
     return jsonify(result)
+
+
+# ================= STUDENT NOTIFICATIONS =================
+@app.route("/student/notifications")
+def student_notifications_api():
+
+    if session.get("role") != "student":
+        return jsonify(None)
+
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+
+    row = conn.execute("""
+        SELECT message
+        FROM student_notifications
+        WHERE user_id = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    """, (session["user_id"],)).fetchone()
+
+    conn.close()
+
+    return jsonify(row["message"] if row else None)
+
 
 
 @app.route("/student/pickup_order")
@@ -2021,6 +2071,27 @@ def restore_expired_temp_bus_and_pickups():
 
     conn.commit()
     conn.close()
+
+@app.route("/student/set_pickup", methods=["POST"])
+def set_pickup_api():
+
+    if session.get("role") != "student":
+        return jsonify({"status": "error"})
+
+    data = request.json
+    lat = data["latitude"]
+    lng = data["longitude"]
+
+    conn = get_db_connection()
+    conn.execute("""
+        UPDATE pickup_points
+        SET latitude = ?, longitude = ?
+        WHERE user_id = ?
+    """, (lat, lng, session["user_id"]))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "ok"})
 
 # ================= APP RUN =================
 if __name__ == "__main__":

@@ -10,17 +10,52 @@
           href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
     <style>
+        /* 🔔 Toast Notification */
+.toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #020617;
+    color: #e5e7eb;
+    padding: 14px 18px;
+    border-radius: 14px;
+    font-size: 14px;
+    max-width: 90%;
+    text-align: center;
+
+    border-left: 5px solid #22c55e;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s ease;
+    z-index: 99999;
+}
+
+.toast.show {
+    opacity: 1;
+    bottom: 40px;
+}
+
         .main-content {
             padding: 30px;
             color: white;
         }
        
         #map {
-        height: 60vh;
-        min-height: 400px;
-        width: 100%;
-        border-radius: 10px;
-         }
+    width: 100%;
+    height: 55vh;
+    border-radius: 12px;
+}
+
+/* 📱 Mobile fix */
+@media (max-width: 768px) {
+    #map {
+        height: 65vh;   /* bigger on mobile */
+    }
+}
+
 
     </style>
 </head>
@@ -57,7 +92,41 @@
 
     <!-- MAP -->
     <div class="card">
-        <div id="map"></div>
+
+    <!-- ===== BUS LIVE STATS ===== -->
+    <div class="bus-stats">
+        <div class="bus-stat">
+            🚗 Speed<br>
+            <b><span id="busSpeed">--</span> km/h</b>
+        </div>
+        <div class="bus-stat">
+            📏 Distance<br>
+            <b><span id="busDistance">--</span></b>
+        </div>
+        <div class="bus-stat">
+            ⏱ ETA<br>
+            <b><span id="busETA">--</span> min</b>
+        </div>
+    </div>
+    <!-- 🚨 DRIVER OFFLINE BANNER -->
+<div id="driverOffline"
+     style="
+        display:none;
+        margin-bottom:12px;
+        padding:12px;
+        border-radius:12px;
+        background:#450a0a;
+        color:#fecaca;
+        border-left:6px solid #ef4444;
+        font-weight:600;
+        text-align:center;
+     ">
+    🚫 Driver is offline or GPS not updating
+</div>
+
+
+    <div id="map"></div>
+
 
         {% if session.get("role") == "student" %}
         <div class="pickup-actions">
@@ -70,6 +139,9 @@
                     🔁 Update Pickup Point
                 </a>
             {% endif %}
+              <!-- ✅ ONE-CLICK GPS PICKUP -->
+    
+
         </div>
         {% endif %}
 
@@ -189,42 +261,85 @@ function loadLocation() {
     fetch("/student/get_location")
         .then(r => r.json())
         .then(d => {
+
+            const offlineBanner = document.getElementById("driverOffline");
+
+            // 🚫 Driver offline or no data
+            if (!d || d.online === false) {
+                if (offlineBanner) offlineBanner.style.display = "block";
+                return;
+            }
+
+            // ✅ Driver online
+            if (offlineBanner) offlineBanner.style.display = "none";
+
             if (!d.latitude || !d.longitude) return;
 
-            // ✅ create marker ONLY when first GPS arrives
+            const newPos = L.latLng(d.latitude, d.longitude);
+
+            // ✅ First GPS fix
             if (!driverMarker) {
-                driverMarker = L.marker([d.latitude, d.longitude]).addTo(map);
-                map.setView([d.latitude, d.longitude], 13);
-            } else {
-                driverMarker.setLatLng([d.latitude, d.longitude]);
+                driverMarker = L.marker(newPos).addTo(map);
+                map.setView(newPos, 13);
+            }
+            // ✅ Smooth movement (NO JUMP)
+            else {
+                moveMarkerSmooth(driverMarker, newPos, 1000);
             }
 
             driverReady = true;
 
-            // ✅ center map only once
+            // center map only once
             if (!mapCentered) {
                 mapCentered = true;
             }
 
             updateDistance(d.latitude, d.longitude);
 
-            // ✅ draw route ONLY when everything is ready
-            if (!routeDrawn && pickupLat !== null && driverMarker) {
+            // draw route ONLY once
+            if (!routeDrawn && pickupLat !== null && driverReady) {
                 drawRoute();
             }
+        })
+        .catch(err => {
+            console.error("Location error:", err);
+
+            // network error = treat as offline
+            const offlineBanner = document.getElementById("driverOffline");
+            if (offlineBanner) offlineBanner.style.display = "block";
         });
 }
 
 
+/* ---------------- SMOOTH MARKER MOVE ---------------- */
+function moveMarkerSmooth(marker, newLatLng, duration = 1000) {
+    const start = marker.getLatLng();
+    const startTime = performance.now();
+
+    function animate(time) {
+        const t = Math.min((time - startTime) / duration, 1);
+
+        const lat = start.lat + (newLatLng.lat - start.lat) * t;
+        const lng = start.lng + (newLatLng.lng - start.lng) * t;
+
+        marker.setLatLng([lat, lng]);
+
+        if (t < 1) requestAnimationFrame(animate);
+    }
+
+    requestAnimationFrame(animate);
+}
+
+/* ---------------- ROUTE (ONCE) ---------------- */
 /* ---------------- ROUTE (ONCE) ---------------- */
 function drawRoute() {
-    if (!driverReady || routeDrawn) return;
+    if (!driverReady || routeDrawn || !driverMarker) return;
 
     fetch("/route_data/{{ bus.id }}")
         .then(r => r.json())
         .then(data => {
 
-            const d = driverMarker.getLatLng();
+            const d = driverMarker.getLatLng(); // now guaranteed fresh
             let waypoints = [L.latLng(d.lat, d.lng)];
 
             data.pickups.forEach(p => {
@@ -530,6 +645,94 @@ loadNearbyBuses();
 
 
 {% endif %}
+<!-- 🔔 Toast Notification -->
+<div id="toast" class="toast"></div>
+<script>
+
+/* 🔔 Toast + Vibration */
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+
+    toast.innerText = message;
+    toast.classList.add("show");
+
+    // 📳 VIBRATION — exactly 1 second (Android only)
+    if ("vibrate" in navigator) {
+        navigator.vibrate(1000);
+    }
+
+    // auto hide after 5 seconds
+    setTimeout(() => {
+        toast.classList.remove("show");
+    }, 5000);
+}
+
+/* 🔔 Check student notifications */
+function checkStudentNotification() {
+    fetch("/student/notifications")
+        .then(r => r.json())
+        .then(msg => {
+            if (msg) {
+                showToast(msg);
+            }
+        })
+        .catch(err => console.error("Notification error:", err));
+}
+
+/* run once on page load */
+checkStudentNotification();
+
+/* check every 30 seconds */
+setInterval(checkStudentNotification, 30000);
+</script>
+
+
+<script>
+function loadBusStats() {
+
+    fetch("/student/get_location")
+        .then(r => r.json())
+        .then(d => {
+            if (!d || !d.latitude) return;
+
+            // speed (already computed by driver)
+            if (d.speed !== undefined) {
+                document.getElementById("busSpeed").innerText = d.speed;
+            }
+        });
+
+    fetch("/student/pickup_order")
+        .then(r => r.json())
+        .then(data => {
+
+            if (!data.pickups || data.pickups.length === 0) return;
+
+            const myPickup = data.pickups.find(p => p.is_me);
+            if (!myPickup) return;
+
+            // distance
+            if (myPickup.distance < 1000) {
+                document.getElementById("busDistance").innerText =
+                    myPickup.distance + " m";
+            } else {
+                document.getElementById("busDistance").innerText =
+                    (myPickup.distance / 1000).toFixed(1) + " km";
+            }
+
+            // ETA (if you already calculate it in backend)
+            if (data.eta !== undefined) {
+                document.getElementById("busETA").innerText = data.eta;
+            }
+        });
+}
+
+loadBusStats();
+setInterval(loadBusStats, 5000);
+</script>
+
+
+
 
 </body>
 </html>

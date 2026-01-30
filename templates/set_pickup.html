@@ -4,23 +4,35 @@
 <div class="page-content">
     <h2>📍 Select Pickup Point</h2>
     <p class="pickup-subtext">
-        Click on the map to choose your exact pickup location.
+        Click on the map or use GPS to choose your exact pickup location.
     </p>
 
     <div class="pickup-layout">
-        <!-- FORM CARD -->
+
+        <!-- ================= FORM CARD ================= -->
         <div class="pickup-card">
             <h3>📝 Pickup Details</h3>
 
             <form method="POST">
+
                 <label>Pickup Location Name</label>
-                <input type="text" name="pickup_name" placeholder="Eg: Main Gate, Hostel" required>
+                <input type="text"
+                       name="pickup_name"
+                       placeholder="Eg: Main Gate, Hostel"
+                       required>
 
                 <label>Latitude</label>
                 <input type="text" id="lat" name="latitude" readonly required>
 
                 <label>Longitude</label>
                 <input type="text" id="lng" name="longitude" readonly required>
+
+                <!-- GPS BUTTON -->
+                <button type="button"
+                        onclick="useCurrentLocation()"
+                        class="btn-gps">
+                    📍 Use My Current Location
+                </button>
 
                 <button type="submit" class="save-btn">
                     ✅ Save Pickup Point
@@ -32,10 +44,11 @@
             </div>
         </div>
 
-        <!-- MAP CARD -->
+        <!-- ================= MAP CARD ================= -->
         <div class="map-card">
             <div id="map"></div>
         </div>
+
     </div>
 </div>
 
@@ -54,10 +67,17 @@
     gap: 20px;
 }
 
+/* Mobile layout */
+@media (max-width: 900px) {
+    .pickup-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Cards */
 .pickup-card,
 .map-card {
-    background: linear-gradient(180deg, #020617, #020617);
+    background: #020617;
     border-radius: 14px;
     padding: 18px;
     box-shadow:
@@ -66,17 +86,11 @@
 }
 
 /* Form */
-.pickup-card h3 {
-    margin-top: 0;
-    margin-bottom: 14px;
-    color: #e5e7eb;
-}
-
 .pickup-card label {
     font-size: 13px;
     color: #94a3b8;
-    display: block;
     margin-bottom: 6px;
+    display: block;
 }
 
 .pickup-card input {
@@ -86,32 +100,33 @@
     border: none;
     background: #020617;
     color: white;
-    outline: none;
     margin-bottom: 14px;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
 }
 
-.pickup-card input::placeholder {
-    color: #64748b;
+/* GPS Button */
+.btn-gps {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #020617;
+    border: none;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
 }
 
-/* Button */
+/* Save Button */
 .save-btn {
     width: 100%;
     padding: 14px;
     border-radius: 12px;
     border: none;
-    cursor: pointer;
-    font-weight: 700;
     background: linear-gradient(135deg, #16a34a, #22c55e);
     color: #052e16;
-    box-shadow: 0 10px 25px rgba(34,197,94,0.45);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.save-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 14px 32px rgba(34,197,94,0.6);
+    font-weight: 700;
 }
 
 /* Hint */
@@ -124,48 +139,80 @@
 /* Map */
 #map {
     width: 100%;
-    height: 420px;
+    height: 60vh;
+    min-height: 320px;
     border-radius: 12px;
-    overflow: hidden;
 }
 
-/* Mobile */
-@media (max-width: 900px) {
-    .pickup-layout {
-        grid-template-columns: 1fr;
-    }
-
+/* Mobile map */
+@media (max-width: 768px) {
     #map {
-        height: 360px;
+        height: 70vh;
+        min-height: 380px;
     }
 }
 </style>
 
-<!-- ================= MAP (UNCHANGED LOGIC) ================= -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<!-- ================= LEAFLET ================= -->
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    var map = L.map('map').setView([17.3850, 78.4867], 13); // default Hyderabad
-    var marker;
+/* ================= MAP INIT ================= */
+var map = L.map('map').setView([17.3850, 78.4867], 13);
+var pickupMarker = null;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
 
-    map.on('click', function(e) {
-        if (marker) {
-            marker.setLatLng(e.latlng);
-        } else {
-            marker = L.marker(e.latlng).addTo(map);
-        }
+/* 🔧 Force resize AFTER layout settles */
+window.addEventListener("load", () => {
+    map.invalidateSize();
+});
 
-        document.getElementById("lat").value = e.latlng.lat;
-        document.getElementById("lng").value = e.latlng.lng;
-    });
+/* ================= MAP CLICK ================= */
+map.on('click', function(e) {
+
+    if (pickupMarker) {
+        pickupMarker.setLatLng(e.latlng);
+    } else {
+        pickupMarker = L.marker(e.latlng).addTo(map);
+    }
+
+    document.getElementById("lat").value = e.latlng.lat;
+    document.getElementById("lng").value = e.latlng.lng;
+});
+
+/* ================= GPS ================= */
+function useCurrentLocation() {
+
+    if (!navigator.geolocation) {
+        alert("GPS not supported on this device");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+
+            if (pickupMarker) {
+                pickupMarker.setLatLng([lat, lng]);
+            } else {
+                pickupMarker = L.marker([lat, lng]).addTo(map);
+            }
+
+            map.setView([lat, lng], 16);
+
+            document.getElementById("lat").value = lat;
+            document.getElementById("lng").value = lng;
+        },
+        () => alert("GPS permission denied"),
+        { enableHighAccuracy: true }
+    );
+}
 </script>
 
 {% endblock %}
