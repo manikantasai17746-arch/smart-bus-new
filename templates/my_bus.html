@@ -205,7 +205,7 @@ let pickupLat = null;
 let pickupLng = null;
 
 let driverReady = false;
-let routeDrawn = false;
+
 let mapCentered = false;
 
 /* ---------------- MAP ---------------- */
@@ -323,11 +323,13 @@ function loadLocation() {
             }
 
             updateDistance(d.latitude, d.longitude);
+            // 🔁 REDRAW ROUTE ON EVERY GPS UPDATE
+if (pickupLat !== null && driverReady) {
+    drawRoute();
+}
 
-            // draw route ONLY once
-            if (!routeDrawn && pickupLat !== null && driverReady) {
-                drawRoute();
-            }
+
+            
         })
         .catch(err => {
             console.error("Location error:", err);
@@ -361,7 +363,13 @@ function moveMarkerSmooth(marker, newLatLng, duration = 1000) {
 /* ---------------- ROUTE (ONCE) ---------------- */
 /* ---------------- ROUTE (ONCE) ---------------- */
 function drawRoute() {
-    if (!driverReady || routeDrawn || !driverMarker) return;
+    if (!driverReady || !driverMarker) return;
+
+    // 🔥 ERASE OLD ROUTE
+    if (routingControl) {
+        map.removeControl(routingControl);
+        routingControl = null;
+    }
 
     fetch("/route_data/{{ bus.id }}")
         .then(r => r.json())
@@ -369,51 +377,49 @@ function drawRoute() {
 
             const d = driverMarker.getLatLng();
 
-            let waypoints = [
-                L.latLng(d.lat, d.lng)   // 🚍 Driver start
-            ];
+            let waypoints = [L.latLng(d.lat, d.lng)];
 
-            // 📍 Pickup points
-            data.pickups.forEach(p => {
-                L.marker([p.lat, p.lng], {
-                    icon: pickupIcon
-                })
+            // 📍 Draw pickup markers ONCE
+            if (!pickupMarkersDrawn) {
+                data.pickups.forEach(p => {
+                    L.marker([p.lat, p.lng], { icon: pickupIcon })
+                        .addTo(map)
+                        .bindPopup("Pickup: " + p.name);
+
+                    waypoints.push(L.latLng(p.lat, p.lng));
+                });
+                pickupMarkersDrawn = true;
+            } else {
+                data.pickups.forEach(p => {
+                    waypoints.push(L.latLng(p.lat, p.lng));
+                });
+            }
+
+            // 🏁 Destination marker ONCE
+            if (!destinationMarker) {
+                destinationMarker = L.marker(
+                    [data.destination.lat, data.destination.lng],
+                    { icon: destinationIcon }
+                )
                 .addTo(map)
-                .bindPopup("Pickup: " + p.name);
+                .bindPopup("🏁 Destination");
 
-                waypoints.push(L.latLng(p.lat, p.lng));
-            });
+                destinationMarker.setZIndexOffset(900);
+            }
 
-            // 🏁 Destination marker (DISTINCT)
-           const destMarker = L.marker(
-    [data.destination.lat, data.destination.lng],
-    { icon: destinationIcon }
-)
-.addTo(map)
-.bindPopup("🏁 Destination");
-
-destMarker.setZIndexOffset(900); // 🔥 ADD HERE
-
-
-            // 🏁 Destination waypoint (YOU MISSED THIS)
             waypoints.push(
                 L.latLng(data.destination.lat, data.destination.lng)
             );
 
-            // 🛣 Route
             routingControl = L.Routing.control({
                 waypoints: waypoints,
                 addWaypoints: false,
                 draggableWaypoints: false,
-                show: false,
-                lineOptions: {
-                    styles: [{ color: 'blue', weight: 5 }]
-                }
+                show: false
             }).addTo(map);
-
-            routeDrawn = true;
         });
 }
+
 
 /* ---------------- DISTANCE ---------------- */
 function updateDistance(busLat, busLng) {
