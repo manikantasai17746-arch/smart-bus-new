@@ -1054,3 +1054,63 @@ ul {
         grid-template-columns: 1fr;
     }
 }
+/* ===== CHAT UI (STUDENT + DRIVER SAME) ===== */
+
+.chat-box {
+    height: 280px;
+    overflow-y: auto;
+    padding: 12px;
+    background: #0f172a;
+    border-radius: 12px;
+    border: 1px solid #334155;
+}
+
+.msg {
+    margin-bottom: 10px;
+    max-width: 75%;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.msg.you {
+    margin-left: auto;
+    background: #22c55e;
+    color: #052e16;
+}
+
+.msg.other {
+    margin-right: auto;
+    background: #1e293b;
+    color: #e5e7eb;
+}
+
+.msg small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.6;
+    margin-top: 4px;
+}
+
+.chat-input {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.chat-input textarea {
+    flex: 1;
+    resize: none;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.chat-input button {
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: #22c55e;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+}

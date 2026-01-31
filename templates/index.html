@@ -8,63 +8,83 @@
   <!-- Flask static CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
-  {% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <div class="flash-container">
-      {% for message in messages %}
-        <div class="flash-message">
-          {{ message }}
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+  <div class="flash-container">
+    {% for message in messages %}
+      <div class="flash-message">{{ message }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
 {% endwith %}
 
+<!-- =============================
+     WRAPPER
+============================= -->
+<div class="wrapper" id="formWrapper">
 
-<div class="wrapper active" id="formWrapper">
-  
-  <!-- Signup Form (FIRST) -->
+  <!-- =============================
+       SIGN UP FORM
+  ============================= -->
   <div class="form-container signin">
     <h2>Sign Up</h2>
-    <form method="POST" action="/signup">
 
+    <form method="POST" action="/signup">
       <input type="text" name="username" placeholder="Username" required />
       <input type="email" name="email" placeholder="Email" required />
       <input type="password" name="password" placeholder="Password" required />
       <input type="password" name="confirm_password" placeholder="Confirm Password" required />
 
       <label class="accept-terms">
-        <input type="checkbox" required /> I accept the terms & conditions
+        <input type="checkbox" required />
+        I accept the terms & conditions
       </label>
 
       <button type="submit" class="submit-btn">Sign Up</button>
     </form>
+
+    <!-- Mobile switch -->
+    <p class="mobile-switch">
+      Already have an account?
+      <a href="#" onclick="showLogin()">Login</a>
+    </p>
   </div>
 
-  <!-- Login Form (SECOND) -->
+  <!-- =============================
+       LOGIN FORM
+  ============================= -->
   <div class="form-container login">
     <h2>Login</h2>
+
     <form method="POST" action="/login">
 
-    <div class="roles">
+      <div class="roles">
         <button type="button" class="active" onclick="setRole('student', this)">Student</button>
         <button type="button" onclick="setRole('admin', this)">Admin</button>
         <button type="button" onclick="setRole('driver', this)">Driver</button>
-    </div>
+      </div>
 
-    <input type="hidden" name="role" id="roleInput" value="student">
+      <input type="hidden" name="role" id="roleInput" value="student">
 
-    <input type="text" name="login_user" placeholder="Username or Email" required>
-    <input type="password" name="login_password" placeholder="Password" required>
+      <input type="text" name="login_user" placeholder="Username or Email" required />
+      <input type="password" name="login_password" placeholder="Password" required />
 
-    <button type="submit" class="submit-btn">LOGIN</button>
+      <button type="submit" class="submit-btn">LOGIN</button>
+    </form>
 
-</form>
-
+    <!-- Mobile switch -->
+    <p class="mobile-switch">
+      New user?
+      <a href="#" onclick="showSignup()">Sign up</a>
+    </p>
   </div>
 
-  <!-- Toggle Panel -->
+  <!-- =============================
+       DESKTOP TOGGLE PANEL
+  ============================= -->
   <div class="toggle-container">
     <h2 id="toggleHeading">Already have an account?</h2>
     <p id="toggleText">Login to your account!</p>
@@ -73,6 +93,9 @@
 
 </div>
 
+<!-- =============================
+     DESKTOP TOGGLE SCRIPT
+============================= -->
 <script>
   const wrapper = document.getElementById('formWrapper');
   const toggleBtn = document.getElementById('toggleBtn');
@@ -82,7 +105,7 @@
   toggleBtn.addEventListener('click', () => {
     wrapper.classList.toggle('active');
 
-    if(wrapper.classList.contains('active')){
+    if (wrapper.classList.contains('active')) {
       toggleHeading.textContent = "Already have an account?";
       toggleText.textContent = "Login to your account!";
       toggleBtn.textContent = "Login";
@@ -94,12 +117,28 @@
   });
 </script>
 
+<!-- =============================
+     ROLE SELECT SCRIPT
+============================= -->
 <script>
 function setRole(role, btn) {
-    document.getElementById("roleInput").value = role;
-    document.querySelectorAll(".roles button")
-        .forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
+  document.getElementById("roleInput").value = role;
+  document.querySelectorAll(".roles button")
+    .forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+}
+</script>
+
+<!-- =============================
+     MOBILE BEHAVIOR SCRIPT
+============================= -->
+<script>
+function showSignup() {
+  wrapper.classList.add("mobile-signup");
+}
+
+function showLogin() {
+  wrapper.classList.remove("mobile-signup");
 }
 </script>
 

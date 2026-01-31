@@ -214,8 +214,29 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
 
 
 /* ---------------- ICON ---------------- */
+/* ---------------- ICONS ---------------- */
+
+// 🚌 DRIVER (GREEN BUS PIN)
+const driverIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34]
+});
+
+// 📍 PICKUP (BLUE)
 const pickupIcon = L.icon({
     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34]
+});
+
+// 🏁 DESTINATION (RED)
+const destinationIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
@@ -278,10 +299,17 @@ function loadLocation() {
             const newPos = L.latLng(d.latitude, d.longitude);
 
             // ✅ First GPS fix
-            if (!driverMarker) {
-                driverMarker = L.marker(newPos).addTo(map);
-                map.setView(newPos, 13);
-            }
+           if (!driverMarker) {
+    driverMarker = L.marker(newPos, {
+        icon: driverIcon
+    }).addTo(map);
+
+    driverMarker.setZIndexOffset(1000); // 🔥 THIS LINE
+
+    map.setView(newPos, 13);
+}
+
+
             // ✅ Smooth movement (NO JUMP)
             else {
                 moveMarkerSmooth(driverMarker, newPos, 1000);
@@ -339,20 +367,40 @@ function drawRoute() {
         .then(r => r.json())
         .then(data => {
 
-            const d = driverMarker.getLatLng(); // now guaranteed fresh
-            let waypoints = [L.latLng(d.lat, d.lng)];
+            const d = driverMarker.getLatLng();
 
+            let waypoints = [
+                L.latLng(d.lat, d.lng)   // 🚍 Driver start
+            ];
+
+            // 📍 Pickup points
             data.pickups.forEach(p => {
-                L.marker([p.lat, p.lng])
-                    .addTo(map)
-                    .bindPopup("Pickup: " + p.name);
+                L.marker([p.lat, p.lng], {
+                    icon: pickupIcon
+                })
+                .addTo(map)
+                .bindPopup("Pickup: " + p.name);
+
                 waypoints.push(L.latLng(p.lat, p.lng));
             });
 
+            // 🏁 Destination marker (DISTINCT)
+           const destMarker = L.marker(
+    [data.destination.lat, data.destination.lng],
+    { icon: destinationIcon }
+)
+.addTo(map)
+.bindPopup("🏁 Destination");
+
+destMarker.setZIndexOffset(900); // 🔥 ADD HERE
+
+
+            // 🏁 Destination waypoint (YOU MISSED THIS)
             waypoints.push(
                 L.latLng(data.destination.lat, data.destination.lng)
             );
 
+            // 🛣 Route
             routingControl = L.Routing.control({
                 waypoints: waypoints,
                 addWaypoints: false,

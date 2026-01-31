@@ -875,7 +875,7 @@ def student_get_location():
         return jsonify({})
 
     row = conn.execute("""
-        SELECT latitude, longitude, updated_at
+        SELECT latitude, longitude, speed, updated_at
         FROM bus_location
         WHERE bus_id = ?
         ORDER BY updated_at DESC
@@ -891,8 +891,9 @@ def student_get_location():
     if not row:
         return jsonify({"online": False})
 
-    last_update = datetime.fromisoformat(row["updated_at"])
-    last_update = last_update.replace(tzinfo=timezone.utc)
+    last_update = datetime.fromisoformat(row["updated_at"]).replace(
+        tzinfo=timezone.utc
+    )
 
     now = datetime.now(timezone.utc)
     age = int((now - last_update).total_seconds())
@@ -900,8 +901,9 @@ def student_get_location():
     online = age <= 20
 
     return jsonify({
-        "latitude": float(row["latitude"]),
-        "longitude": float(row["longitude"]),
+        "latitude": float(row["latitude"]) if row["latitude"] else None,
+        "longitude": float(row["longitude"]) if row["longitude"] else None,
+        "speed": float(row["speed"]) if row["speed"] is not None else None,
         "eta": eta_row["eta"] if eta_row else None,
         "online": online,
         "age": age,
@@ -2092,6 +2094,184 @@ def set_pickup_api():
     conn.close()
 
     return jsonify({"status": "ok"})
+
+# ================= BUS MESSAGES =================
+@app.route("/messages/send", methods=["POST"])
+def send_message():
+    if "user_id" not in session:
+        return jsonify({"error": "Login required"}), 403
+
+    message = request.json.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
+
+    conn = get_db_connection()
+
+    user = conn.execute(
+        "SELECT role, bus_id FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    if not user or not user["bus_id"]:
+        return jsonify({"error": "No bus assigned"}), 400
+
+    conn.execute(
+        """
+        INSERT INTO bus_messages (bus_id, sender_id, sender_role, message)
+        VALUES (?, ?, ?, ?)
+        """,
+        (user["bus_id"], session["user_id"], user["role"], message)
+    )
+
+    conn.commit()
+    return jsonify({"success": True})
+
+# ================= GET BUS MESSAGES =================
+@app.route("/messages")
+def get_messages():
+    if "user_id" not in session:
+        return jsonify([])
+
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+
+    # get logged-in user's bus
+    user = conn.execute(
+        "SELECT role, bus_id FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    if not user or not user["bus_id"]:
+        return jsonify([])
+
+    # delete messages older than 6 hours
+    conn.execute("""
+        DELETE FROM bus_messages
+        WHERE created_at < DATETIME('now', '-6 hours')
+    """)
+    conn.commit()
+
+    # fetch messages with username
+    messages = conn.execute("""
+        SELECT
+            bm.message,
+            bm.sender_role,
+            u.username,
+            bm.created_at
+        FROM bus_messages bm
+        JOIN users u ON u.id = bm.sender_id
+        WHERE bm.bus_id = ?
+        ORDER BY bm.created_at ASC
+    """, (user["bus_id"],)).fetchall()
+
+    return jsonify([dict(m) for m in messages])
+
+# ================= ADMIN SEND MESSAGE TO ALL STUDENTS =================
+@app.route("/admin/send_message", methods=["POST"])
+def admin_send_message():
+    if session.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.json
+    message = data.get("message", "").strip()
+    role = data.get("role")  # 'student' or 'driver'
+
+    if not message or role not in ("student", "driver"):
+        return jsonify({"error": "Invalid data"}), 400
+
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+
+    users = conn.execute(
+        "SELECT id FROM users WHERE role = ?",
+        (role,)
+    ).fetchall()
+
+    for u in users:
+        conn.execute("""
+            INSERT INTO student_notifications (user_id, title, message)
+            VALUES (?, ?, ?)
+        """, (u["id"], "📢 Admin Announcement", message))
+
+    conn.commit()
+    return jsonify({"sent": len(users)})
+
+
+# ================= STUDENT GET ADMIN MESSAGES =================
+@app.route("/student/admin_messages")
+def student_admin_messages():
+    if session.get("role") != "student":
+        return jsonify([])
+
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+
+    # 🔥 DELETE admin messages older than 12 hours
+    conn.execute("""
+        DELETE FROM student_notifications
+        WHERE created_at < DATETIME('now', '-12 hours')
+    """)
+    conn.commit()
+
+    # fetch remaining messages
+    msgs = conn.execute("""
+        SELECT message, created_at
+        FROM student_notifications
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    """, (session["user_id"],)).fetchall()
+
+    return jsonify([dict(m) for m in msgs])
+# ================= DRIVER GET ADMIN MESSAGES =================
+@app.route("/driver/admin_messages")
+def driver_admin_messages():
+    if session.get("role") != "driver":
+        return jsonify([])
+
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+
+    # delete admin messages older than 12 hours
+    conn.execute("""
+        DELETE FROM student_notifications
+        WHERE created_at < DATETIME('now', '-12 hours')
+    """)
+    conn.commit()
+
+    msgs = conn.execute("""
+        SELECT message, created_at
+        FROM student_notifications
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    """, (session["user_id"],)).fetchall()
+
+    return jsonify([dict(m) for m in msgs])
+# ================= ADMIN GET ADMIN MESSAGES =================
+@app.route("/admin_messages")
+def admin_messages():
+    # only student & driver can see admin messages
+    if session.get("role") not in ("student", "driver"):
+        return jsonify([])
+
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+
+    # delete admin messages older than 12 hours
+    conn.execute("""
+        DELETE FROM student_notifications
+        WHERE created_at < DATETIME('now', '-12 hours')
+    """)
+    conn.commit()
+
+    # fetch messages for logged-in user
+    msgs = conn.execute("""
+        SELECT message, created_at
+        FROM student_notifications
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    """, (session["user_id"],)).fetchall()
+
+    return jsonify([dict(m) for m in msgs])
 
 # ================= APP RUN =================
 if __name__ == "__main__":

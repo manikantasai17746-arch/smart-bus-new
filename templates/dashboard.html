@@ -10,6 +10,8 @@
 
     {% if session.get("role") == "student" %}
     <!-- ================= STUDENT DASHBOARD ================= -->
+     <div id="adminAlerts"></div>
+
 
     <h3 id="busStatus">Loading bus status...</h3>
 
@@ -47,9 +49,26 @@
             <span>Arrived to College</span>
         </div>
     </div>
+    <hr>
+
+<hr>
+
+<h3>💬 Bus Messages</h3>
+
+<div id="chatBox" class="chat-box"></div>
+
+<div class="chat-input">
+    <textarea id="msgInput" placeholder="Type your message..."></textarea>
+    <button onclick="sendMessage()">Send</button>
+</div>
+
+
+
 
     {% elif session.get("role") == "driver" %}
     <!-- ================= DRIVER DASHBOARD ================= -->
+     <div id="adminAlerts"></div>
+
 
     <div class="driver-dashboard">
         <div class="driver-card primary">
@@ -72,6 +91,22 @@
                 <li>Use SOS only in emergency</li>
             </ul>
         </div>
+        <hr>
+
+<h3 style="color:#e5e7eb;">💬 Bus Messages</h3>
+
+<div id="chatBox"
+     style="border:1px solid #334155;height:260px;overflow-y:auto;
+            padding:10px;background:#020617;color:#e5e7eb;">
+</div>
+
+<textarea id="msgInput"
+          placeholder="Send message to students..."
+          style="width:100%;margin-top:8px;"></textarea>
+
+<button class="driver-btn" onclick="sendMessage()">Send</button>
+
+        
     </div>
 
     {% endif %}
@@ -79,6 +114,23 @@
 
 <!-- ================= STUDENT STYLE (KEEP) ================= -->
 <style>
+    /* ADMIN MESSAGE HIGHLIGHT (STUDENT ONLY) */
+.admin-alert {
+    background: #fde047;
+    color: #713f12;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+
+.admin-alert small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.6;
+    margin-top: 6px;
+}
+/* ===== BUS STATUS STEPPER ===== */
 .stepper {
     display: flex;
     align-items: center;
@@ -171,6 +223,67 @@
     transform: translateY(-1px);
     box-shadow: 0 14px 32px rgba(34,197,94,0.6);
 }
+/* ===== CHAT UI (STUDENT + DRIVER SAME) ===== */
+
+.chat-box {
+    height: 280px;
+    overflow-y: auto;
+    padding: 12px;
+    background: #0f172a;
+    border-radius: 12px;
+    border: 1px solid #334155;
+}
+
+.msg {
+    margin-bottom: 10px;
+    max-width: 75%;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.msg.you {
+    margin-left: auto;
+    background: #22c55e;
+    color: #052e16;
+}
+
+.msg.other {
+    margin-right: auto;
+    background: #1e293b;
+    color: #e5e7eb;
+}
+
+.msg small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.6;
+    margin-top: 4px;
+}
+
+.chat-input {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.chat-input textarea {
+    flex: 1;
+    resize: none;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.chat-input button {
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: #22c55e;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+}
+
 </style>
 
 <!-- ================= STUDENT SCRIPT ONLY ================= -->
@@ -201,7 +314,99 @@ function activate(ids) {
 }
 loadBusStatus();
 setInterval(loadBusStatus, 5000);
+
+
+</script>
+
+{% endif %}
+{% if session.get("role") == "student" or session.get("role") == "driver" %}
+<script>
+/* expose role to JS safely */
+const USER_ROLE = "{{ session.get('role') }}";
+
+function loadMessages() {
+    fetch("/messages")
+        .then(res => res.json())
+        .then(data => {
+            const box = document.getElementById("chatBox");
+            if (!box) return;
+
+            box.innerHTML = "";
+
+            data.forEach(m => {
+                // determine if the message is sent by the current user
+                const isYou =
+                    (USER_ROLE === "student" && m.sender_role === "student") ||
+                    (USER_ROLE === "driver" && m.sender_role === "driver");
+
+                // sender label
+                const senderName = isYou
+                    ? "You"
+                    : (m.sender_role === "driver" ? "Driver" : m.username);
+
+
+                box.innerHTML += `
+                    <div class="msg ${isYou ? "you" : "other"}">
+                        <b>${senderName}</b><br>
+                        ${m.message}
+                        <small>${m.created_at}</small>
+                    </div>
+                `;
+            });
+
+            box.scrollTop = box.scrollHeight;
+        })
+        .catch(err => {
+            console.error("Message load failed:", err);
+        });
+}
+
+function sendMessage() {
+    const input = document.getElementById("msgInput");
+    if (!input || !input.value.trim()) return;
+
+    fetch("/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: input.value })
+    }).then(() => {
+        input.value = "";
+        loadMessages();
+    });
+}
+
+loadMessages();
+setInterval(loadMessages, 10000);
+</script>
+
+{% endif %}
+{% if session.get("role") == "student" or session.get("role") == "driver" %}
+<script>
+function loadAdminMessages() {
+    fetch("/admin_messages")
+        .then(res => res.json())
+        .then(data => {
+            const box = document.getElementById("adminAlerts");
+            if (!box) return;
+
+            box.innerHTML = "";
+
+            data.forEach(m => {
+                box.innerHTML += `
+                    <div class="admin-alert">
+                        📢 ${m.message}
+                        <small>${m.created_at}</small>
+                    </div>
+                `;
+            });
+        });
+}
+
+// load admin messages once when dashboard opens
+loadAdminMessages();
 </script>
 {% endif %}
+
+
 
 {% endblock %}
