@@ -276,54 +276,34 @@ def my_bus():
         return redirect(url_for("index"))
 
     user_id = session["user_id"]
-
     conn = get_db_connection()
 
-    # --- get user bus ---
-    from datetime import date
-    today = date.today().isoformat()
-
+    # ------------------ GET USER ------------------
     user = conn.execute("""
         SELECT bus_id, temp_bus_id, temp_bus_date
         FROM users
         WHERE id = ?
     """, (user_id,)).fetchone()
 
+    # ------------------ ACTIVE BUS (TEMP-AWARE) ------------------
+    active_bus_id = get_active_bus(user)
+
+    # ------------------ FETCH BUS ------------------
     bus = None
-    # 🔁 RESET TEMP BUS IF EXPIRED (AUTO REASSIGN)
-    if user and user["temp_bus_id"] and user["temp_bus_date"] != today:
-        conn.execute("""
-          UPDATE users
-         SET temp_bus_id = NULL,
-             temp_bus_date = NULL
-         WHERE id = ?
-        """, (user_id,))
-    conn.commit()
+    if active_bus_id:
+        bus = conn.execute(
+            "SELECT * FROM buses WHERE id = ?",
+            (active_bus_id,)
+        ).fetchone()
 
+    # ------------------ FETCH PICKUP (BUS-AWARE) ------------------
+    pickup = conn.execute("""
+        SELECT *
+        FROM pickup_points
+        WHERE user_id = ? AND bus_id = ?
+    """, (user_id, active_bus_id)).fetchone()
 
-
-    if user:
-        # 🔹 TEMP BUS HAS PRIORITY (ONE DAY)
-        if user["temp_bus_id"] and user["temp_bus_date"] == today:
-            bus = conn.execute(
-                "SELECT * FROM buses WHERE id = ?",
-                (user["temp_bus_id"],)
-            ).fetchone()
-            is_temp = True   # 👈 ADD THIS LINE
-
-        elif user["bus_id"]:
-            bus = conn.execute(
-                "SELECT * FROM buses WHERE id = ?",
-                (user["bus_id"],)
-            ).fetchone()
-
-    # --- get pickup ---
-    pickup = conn.execute(
-        "SELECT * FROM pickup_points WHERE user_id = ?",
-        (user_id,)
-    ).fetchone()
-
-    # --- handle POST ---
+    # ------------------ HANDLE POST (ASSIGN ORIGINAL BUS) ------------------
     if request.method == "POST":
         bus_number = request.form.get("bus_number")
 
@@ -345,14 +325,13 @@ def my_bus():
         conn.close()
         return redirect(url_for("my_bus"))
 
-    # --- close DB ONCE ---
     conn.close()
 
+    # ------------------ RENDER ------------------
     return render_template(
         "my_bus.html",
         bus=bus,
-        pickup=pickup,
-        is_temp=False
+        pickup=pickup
     )
 
 
@@ -827,7 +806,7 @@ def set_pickup():
     user_id = session["user_id"]
     conn = get_db_connection()
 
-    # 🔍 Get student's assigned bus
+    # 🔍 Get student's assigned bus (ORIGINAL BUS ONLY)
     student = conn.execute(
         "SELECT bus_id FROM users WHERE id = ?",
         (user_id,)
@@ -852,16 +831,24 @@ def set_pickup():
         lng = request.form["longitude"]
 
         if existing:
+            # ✅ FIX: RESET TEMP FLAGS ON UPDATE
             conn.execute("""
                 UPDATE pickup_points
-                SET pickup_name = ?, latitude = ?, longitude = ?, bus_id = ?
+                SET
+                    pickup_name = ?,
+                    latitude = ?,
+                    longitude = ?,
+                    bus_id = ?,
+                    is_temp = 0,
+                    temp_date = NULL
                 WHERE user_id = ?
             """, (pickup_name, lat, lng, bus_id, user_id))
         else:
+            # ✅ FIX: INSERT AS NORMAL PICKUP
             conn.execute("""
                 INSERT INTO pickup_points
-                (user_id, bus_id, pickup_name, latitude, longitude)
-                VALUES (?, ?, ?, ?, ?)
+                (user_id, bus_id, pickup_name, latitude, longitude, is_temp, temp_date)
+                VALUES (?, ?, ?, ?, ?, 0, NULL)
             """, (user_id, bus_id, pickup_name, lat, lng))
 
         conn.commit()
@@ -872,6 +859,7 @@ def set_pickup():
 
     conn.close()
     return render_template("set_pickup.html")
+
 
 
 
@@ -1610,7 +1598,6 @@ def driver_pickup_order():
 
     conn.close()
     return jsonify(result)
-
 @app.route("/driver/ordered_pickups")
 def driver_ordered_pickups():
 
@@ -1621,7 +1608,7 @@ def driver_ordered_pickups():
     conn = get_db_connection()
     conn.row_factory = sqlite3.Row
 
-    # 1️⃣ Get bus_id
+    # 1️⃣ Get driver's bus
     row = conn.execute(
         "SELECT bus_id FROM users WHERE id=?",
         (session["user_id"],)
@@ -1646,17 +1633,27 @@ def driver_ordered_pickups():
     bus_lat = float(bus["latitude"])
     bus_lng = float(bus["longitude"])
 
-    # 3️⃣ Get pickup points
+    # 3️⃣ TEMP-AWARE PICKUP SELECTION (ONLY CHANGE)
     pickups = conn.execute("""
         SELECT
-            pickup_name,
-            latitude,
-            longitude,
-            pickup_reached,
-            is_temp
-        FROM pickup_points
-        WHERE bus_id=?
-    """, (bus_id,)).fetchall()
+            p.pickup_name,
+            p.latitude,
+            p.longitude,
+            p.pickup_reached,
+            p.is_temp
+        FROM pickup_points p
+        JOIN users u ON u.id = p.user_id
+        WHERE
+            (
+                u.temp_bus_id = ?
+                AND u.temp_bus_date = date('now')
+            )
+            OR
+            (
+                u.bus_id = ?
+                AND (u.temp_bus_date IS NULL OR u.temp_bus_date != date('now'))
+            )
+    """, (bus_id, bus_id)).fetchall()
 
     from math import radians, sin, cos, sqrt, atan2
 
@@ -1681,7 +1678,7 @@ def driver_ordered_pickups():
             float(p["longitude"])
         )
 
-        # 🔒 MONOTONIC STATUS (NO WRITES)
+        # 🔒 MONOTONIC STATUS (UNCHANGED)
         if p["pickup_reached"] == 1:
             status = "Reached"
         elif d <= 500:
@@ -1704,6 +1701,7 @@ def driver_ordered_pickups():
     result.sort(key=lambda x: x["distance"])
 
     return jsonify(result)
+
 
 
 # ================= STUDENT NOTIFICATIONS =================
@@ -1738,17 +1736,25 @@ def student_pickup_order():
 
     conn = get_db_connection()
 
-    student = conn.execute(
-        "SELECT id, bus_id FROM users WHERE id=?",
-        (session["user_id"],)
-    ).fetchone()
+    # 🔹 GET STUDENT (TEMP-AWARE)
+    student = conn.execute("""
+        SELECT id, bus_id, temp_bus_id, temp_bus_date
+        FROM users
+        WHERE id = ?
+    """, (session["user_id"],)).fetchone()
 
-    if not student or not student["bus_id"]:
+    if not student:
         conn.close()
         return jsonify({})
 
-    bus_id = student["bus_id"]
+    # ✅ ONLY CHANGE: decide active bus
+    bus_id = get_active_bus(student)
 
+    if not bus_id:
+        conn.close()
+        return jsonify({})
+
+    # 🔹 BUS LOCATION
     bus = conn.execute(
         "SELECT latitude, longitude FROM bus_location WHERE bus_id=?",
         (bus_id,)
@@ -1756,6 +1762,7 @@ def student_pickup_order():
 
     driver_started = bus is not None
 
+    # 🔹 PICKUP POINTS FOR THAT BUS
     students = conn.execute("""
         SELECT user_id, pickup_name, latitude, longitude
         FROM pickup_points
@@ -1764,20 +1771,18 @@ def student_pickup_order():
 
     pickups = []
 
-    # ✅ THIS LOOP MUST BE INSIDE THE FUNCTION
     for s in students:
 
         if not bus:
             d = 999999
             status = "Pending"
-
         else:
             d = haversine(
                 bus["latitude"], bus["longitude"],
                 s["latitude"], s["longitude"]
             )
 
-            # 🔒 LOCK STATUS
+            # 🔒 LOCK STATUS (UNCHANGED)
             row = conn.execute(
                 "SELECT status FROM pickup_points WHERE user_id=? AND bus_id=?",
                 (s["user_id"], bus_id)
@@ -1817,6 +1822,7 @@ def student_pickup_order():
     })
 
 
+
 def is_driver_started(bus_id, conn):
     row = conn.execute("""
         SELECT 1 FROM bus_location WHERE bus_id=?
@@ -1849,15 +1855,27 @@ def student_driver_contact():
 
     conn = get_db_connection()
 
+    # 🔹 Get student (temp-aware)
+    student = conn.execute("""
+        SELECT bus_id, temp_bus_id, temp_bus_date
+        FROM users
+        WHERE id = ?
+    """, (session["user_id"],)).fetchone()
+
+    if not student:
+        conn.close()
+        return jsonify({})
+
+    # ✅ ACTIVE BUS (ORIGINAL OR TEMP)
+    bus_id = get_active_bus(student)
+
     row = conn.execute("""
         SELECT u.phone, b.bus_number
         FROM users u
         JOIN buses b ON u.bus_id = b.id
         WHERE u.role = 'driver'
-          AND b.id = (
-              SELECT bus_id FROM users WHERE id = ?
-          )
-    """, (session["user_id"],)).fetchone()
+          AND b.id = ?
+    """, (bus_id,)).fetchone()
 
     conn.close()
 
@@ -1871,21 +1889,36 @@ def student_driver_contact():
 
 
 from datetime import date
-# ================= STUDENT MISS BUS =================
-# ================= STUDENT MISSED BUS (SAFE) =================
+
 @app.route("/student/miss_bus", methods=["POST"])
 def student_miss_bus():
 
     if session.get("role") != "student":
         return jsonify({"error": "unauthorized"}), 403
 
-    # ✅ UI STATE FLAG
+    temp_bus_id = request.json.get("bus_id")  # bus chosen by student
+    today = date.today().isoformat()
+
+    if not temp_bus_id:
+        return jsonify({"error": "bus_id required"}), 400
+
+    conn = get_db_connection()
+    conn.execute("""
+        UPDATE users
+        SET temp_bus_id = ?, temp_bus_date = ?
+        WHERE id = ?
+    """, (temp_bus_id, today, session["user_id"]))
+    conn.commit()
+    conn.close()
+
+    # (optional UI flag)
     session["missed_bus"] = True
 
     return jsonify({
         "status": "ok",
-        "message": "Missed bus confirmed. Choose a nearby bus for today."
+        "message": "Temporary bus assigned for today"
     })
+
 
 
 
@@ -2198,7 +2231,6 @@ def get_messages():
     conn = get_db_connection()
     conn.row_factory = sqlite3.Row
 
-    # get logged-in user's bus
     user = conn.execute(
         "SELECT role, bus_id FROM users WHERE id = ?",
         (session["user_id"],)
@@ -2214,11 +2246,12 @@ def get_messages():
     """)
     conn.commit()
 
-    # fetch messages with username
+    # ✅ CHANGE 1: ADD sender_id
     messages = conn.execute("""
         SELECT
             bm.message,
             bm.sender_role,
+            bm.sender_id,        -- 👈 THIS IS THE FIX
             u.username,
             bm.created_at
         FROM bus_messages bm
@@ -2228,6 +2261,7 @@ def get_messages():
     """, (user["bus_id"],)).fetchall()
 
     return jsonify([dict(m) for m in messages])
+
 
 # ================= ADMIN SEND MESSAGE TO ALL STUDENTS =================
 @app.route("/admin/send_message", methods=["POST"])
@@ -2460,6 +2494,56 @@ def student_dashboard_status():
     return jsonify({"show": False})
 
 # ================= RESET TEMP BUS IF EXPIRED =================
+
+from datetime import date
+
+def get_active_bus(student):
+    today = date.today().isoformat()
+
+    if student["temp_bus_id"] and student["temp_bus_date"] == today:
+        return student["temp_bus_id"]
+
+    return student["bus_id"]
+
+# ================= CLEAR EXPIRED TEMP PICKUPS =================
+from datetime import date
+
+def clear_expired_temp_pickups():
+    today = date.today().isoformat()
+
+    conn = get_db_connection()
+    conn.execute("""
+        UPDATE pickup_points
+        SET is_temp = 0,
+            temp_date = NULL
+        WHERE is_temp = 1
+          AND temp_date IS NOT NULL
+          AND temp_date != ?
+    """, (today,))
+    conn.commit()
+    conn.close()
+
+from datetime import date
+
+def clear_expired_temp_pickups():
+    today = date.today().isoformat()
+    conn = get_db_connection()
+    conn.execute("""
+        UPDATE pickup_points
+        SET is_temp = 0,
+            temp_date = NULL
+        WHERE is_temp = 1
+          AND temp_date IS NOT NULL
+          AND temp_date != ?
+    """, (today,))
+    conn.commit()
+    conn.close()
+
+# ================= AUTO CLEANUP BEFORE REQUEST =================
+@app.before_request
+def cleanup_temp_state():
+    clear_expired_temp_pickups()
+()
 
 
 # ================= APP RUN =================

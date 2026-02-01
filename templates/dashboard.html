@@ -1,14 +1,20 @@
 {% extends "base.html" %}
-
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
+
+<!-- SAFE DATA BRIDGE -->
+<div id="js-data"
+     data-user-id="{{ session.get('user_id') }}"
+     data-role="{{ session.get('role') }}">
+</div>
+
 <div class="page-content">
     <h2>Welcome, {{ session.get('username') }}</h2>
-
     <hr>
 
     {% if session.get("role") == "student" %}
+    <!-- ================= STUDENT ================= -->
     <div id="adminAlerts"></div>
 
     <h3 id="busStatus">Loading bus status...</h3>
@@ -38,13 +44,16 @@
 
     <hr>
     <h3>💬 Bus Messages</h3>
+
     <div id="chatBox" class="chat-box"></div>
+
     <div class="chat-input">
-        <textarea id="msgInput" placeholder="Type your message..."></textarea>
-        <button onclick="sendMessage()">Send</button>
+        <textarea id="msgInput" placeholder="Send message..."></textarea>
+        <button class="send-btn" onclick="sendMessage()">Send</button>
     </div>
 
     {% elif session.get("role") == "driver" %}
+    <!-- ================= DRIVER ================= -->
     <div id="adminAlerts"></div>
 
     <div class="driver-dashboard">
@@ -65,42 +74,119 @@
 
         <hr>
         <h3>💬 Bus Messages</h3>
+
         <div id="chatBox" class="chat-box"></div>
-        <textarea id="msgInput" placeholder="Send message..."></textarea>
-        <button class="driver-btn" onclick="sendMessage()">Send</button>
+
+        <div class="chat-input">
+            <textarea id="msgInput" placeholder="Send message..."></textarea>
+            <button class="send-btn" onclick="sendMessage()">Send</button>
+        </div>
     </div>
     {% endif %}
 </div>
 
+<!-- ================= CSS ================= -->
 <style>
-.stepper{display:flex;justify-content:center;margin-top:30px}
-.step{display:flex;flex-direction:column;align-items:center;color:#999}
-.circle{width:18px;height:18px;border-radius:50%;background:#bbb;margin-bottom:6px}
-.line{width:50px;height:3px;background:#ccc;margin:0 6px}
-.step.active .circle{background:#22c55e}
-.step.active span{color:#22c55e;font-weight:bold}
-.chat-box{height:280px;overflow-y:auto;padding:12px;background:#0f172a;border-radius:12px;border:1px solid #334155}
-.msg{margin-bottom:10px;max-width:75%;padding:8px 12px;border-radius:10px}
-.msg.you{margin-left:auto;background:#22c55e;color:#052e16}
-.msg.other{margin-right:auto;background:#1e293b;color:#e5e7eb}
-.admin-alert{background:#fde047;color:#713f12;padding:15px;border-radius:12px;margin-bottom:15px;font-weight:bold}
+.chat-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.chat-input textarea {
+  flex: 1;
+  resize: none;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+
+.send-btn {
+  background: #22c55e;
+  color: #052e16;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.send-btn:hover {
+  background: #16a34a;
+}
+
+.chat-box {
+  height: 280px;
+  overflow-y: auto;
+  padding: 12px;
+  background: #0f172a;
+  border-radius: 12px;
+  border: 1px solid #334155;
+}
+
+.msg {
+  margin-bottom: 10px;
+  max-width: 75%;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.msg.you {
+  margin-left: auto;
+  background: #22c55e;
+  color: #052e16;
+}
+
+.msg.other {
+  margin-right: auto;
+  background: #1e293b;
+  color: #e5e7eb;
+}
+
+/* 🔵 DRIVER MESSAGE (VISIBLE TO STUDENTS) */
+.msg.driver-msg {
+  background: #1e40af;
+  color: #e0f2fe;
+  border-left: 5px solid #38bdf8;
+}
+
+.stepper { display:flex; justify-content:center; margin-top:30px }
+.step { display:flex; flex-direction:column; align-items:center; color:#999 }
+.circle { width:18px; height:18px; border-radius:50%; background:#bbb; margin-bottom:6px }
+.line { width:50px; height:3px; background:#ccc; margin:0 6px }
+.step.active .circle { background:#22c55e }
+.step.active span { color:#22c55e; font-weight:bold }
+
+.admin-alert {
+  background:#fde047;
+  color:#713f12;
+  padding:15px;
+  border-radius:12px;
+  margin-bottom:15px;
+  font-weight:bold;
+}
 </style>
 
-{% if session.get("role") == "student" %}
+<!-- ================= JAVASCRIPT ================= -->
 <script>
+const jsData = document.getElementById("js-data");
+const CURRENT_USER_ID = Number(jsData.dataset.userId);
+const USER_ROLE = jsData.dataset.role;
+
+/* ===== STUDENT BUS STATUS ===== */
 async function loadBusStatus() {
+    if (USER_ROLE !== "student") return;
+
     const res = await fetch("/student/bus_status");
     const data = await res.json();
     if (!data || !data.status) return;
 
-    document.getElementById("busStatus").innerText =
-        "Bus is " + data.status;
+    document.getElementById("busStatus").innerText = "Bus is " + data.status;
 
     const alertBox = document.getElementById("pickupAlert");
     if (data.status === "Approaching") {
         alertBox.style.display = "block";
-        alertBox.innerText =
-            "🚌 Bus is near your pickup point. Please be ready.";
+        alertBox.innerText = "🚌 Bus is near your pickup point. Please be ready.";
     } else {
         alertBox.style.display = "none";
     }
@@ -125,30 +211,38 @@ function activate(ids) {
     ids.forEach(id => document.getElementById(id)?.classList.add("active"));
 }
 
-loadBusStatus();
-setInterval(loadBusStatus, 5000);
-</script>
-{% endif %}
+if (USER_ROLE === "student") {
+    loadBusStatus();
+    setInterval(loadBusStatus, 5000);
+}
 
-{% if session.get("role") in ["student","driver"] %}
-<script>
-const USER_ROLE = "{{ session.get('role') }}";
-
+/* ===== CHAT ===== */
 function loadMessages() {
     fetch("/messages")
         .then(r => r.json())
         .then(data => {
             const box = document.getElementById("chatBox");
             if (!box) return;
+
             box.innerHTML = "";
+
             data.forEach(m => {
-                const isYou = USER_ROLE === m.sender_role;
+                let cls = "other";
+
+                if (CURRENT_USER_ID === m.sender_id) {
+                    cls = "you";
+                } else if (m.sender_role === "driver") {
+                    cls = "driver-msg";
+                }
+
                 box.innerHTML += `
-                    <div class="msg ${isYou ? "you" : "other"}">
-                        <b>${isYou ? "You" : m.username}</b><br>
+                    <div class="msg ${cls}">
+                        <b>${m.sender_role === "driver" ? "🚌 Driver" : m.username}</b><br>
                         ${m.message}
-                    </div>`;
+                    </div>
+                `;
             });
+
             box.scrollTop = box.scrollHeight;
         });
 }
@@ -156,34 +250,31 @@ function loadMessages() {
 function sendMessage() {
     const i = document.getElementById("msgInput");
     if (!i.value.trim()) return;
+
     fetch("/messages/send", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body:JSON.stringify({ message:i.value })
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ message: i.value })
     }).then(() => {
-        i.value="";
+        i.value = "";
         loadMessages();
     });
 }
 
 loadMessages();
 setInterval(loadMessages, 10000);
-</script>
-{% endif %}
 
-{% if session.get("role") in ["student","driver"] %}
-<script>
+/* ===== ADMIN ALERTS ===== */
 fetch("/admin_messages")
     .then(r => r.json())
     .then(data => {
         const box = document.getElementById("adminAlerts");
         if (!box) return;
-        box.innerHTML="";
+        box.innerHTML = "";
         data.forEach(m => {
             box.innerHTML += `<div class="admin-alert">📢 ${m.message}</div>`;
         });
     });
 </script>
-{% endif %}
 
 {% endblock %}

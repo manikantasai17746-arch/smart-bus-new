@@ -444,13 +444,25 @@ function updateDistance(busLat, busLng) {
 
     const d = distanceMeters(busLat, busLng, pickupLat, pickupLng);
 
-    let status = "On the way";
-    if (d < 150) status = "Arrived";
-    else if (d < 500) status = "Approaching";
+    let status;
+
+    // ✅ once reached, NEVER downgrade
+    if (lastMyPickupStatus === "Reached") {
+        status = "Reached";
+    } else if (d < 150) {
+        status = "Reached";
+    } else if (d < 500) {
+        status = "Approaching";
+    } else {
+        status = "On the way";
+    }
+
+    lastMyPickupStatus = status;
 
     document.getElementById("distanceText").innerText =
         `Status: ${status} | Distance: ${Math.round(d)} meters`;
 }
+
   
 
 /*<ul id="studentPickupList" style="list-style:none;padding:0;"></ul>*/
@@ -804,6 +816,25 @@ setInterval(loadBusStats, 5000);
 
 
 
+<script>
+function callDriver() {
+    fetch("/student/driver_contact")
+        .then(response => response.json())
+        .then(data => {
+            if (!data.phone) {
+                alert("Driver contact not available");
+                return;
+            }
+
+            // 📞 THIS OPENS THE DIALER
+            window.location.href = "tel:" + data.phone;
+        })
+        .catch(error => {
+            console.error(error);
+            alert("Failed to call driver");
+        });
+}
+</script>
 
 </body>
 </html>
