@@ -142,50 +142,66 @@ def allowed_file(filename):
 
 
 # ================= USER ROUTES =================
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+import sqlite3
+
+app = Flask(__name__)
+app.secret_key = "secret123"
+
+
+# ---------------- DB CONNECTION ----------------
+def get_db_connection():
+    conn = sqlite3.connect("database.db")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+# ---------------- INDEX ----------------
 @app.route("/")
 def index():
     return render_template("index.html")
 
 
+# ---------------- SIGNUP ----------------
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
         username = request.form["username"]
         email = request.form["email"]
         password = request.form["password"]
+        confirm = request.form["confirm_password"]
+
+        # 🔴 PASSWORD MATCH CHECK (ADDED)
+        if password != confirm:
+            flash("Passwords do not match", "password_error")
+            return redirect(url_for("signup"))
 
         conn = get_db_connection()
 
-        # 🔍 CHECK EMAIL DUPLICATE (PRIMARY RULE)
-        existing_email = conn.execute(
-            "SELECT id FROM users WHERE email = ?",
-            (email,)
-        ).fetchone()
-
-        if existing_email:
+        # 🔍 EMAIL CHECK
+        if conn.execute(
+            "SELECT id FROM users WHERE email = ?", (email,)
+        ).fetchone():
             conn.close()
-            flash("❌ Account already exists with this email. Please login.")
-            return redirect(url_for("index"))
-
-        # 🔍 CHECK USERNAME DUPLICATE (SECONDARY RULE)
-        existing_username = conn.execute(
-            "SELECT id FROM users WHERE username = ?",
-            (username,)
-        ).fetchone()
-
-        if existing_username:
-            conn.close()
-            flash("❌ Username already taken.")
+            flash("Email already exists", "email_error")
             return redirect(url_for("signup"))
 
-        # ✅ CREATE NEW STUDENT
+        # 🔍 USERNAME CHECK
+        if conn.execute(
+            "SELECT id FROM users WHERE username = ?", (username,)
+        ).fetchone():
+            conn.close()
+            flash("Username already taken", "username_error")
+            return redirect(url_for("signup"))
+
+        # ✅ INSERT USER
         conn.execute(
             "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, 'student')",
             (username, email, password)
         )
         conn.commit()
 
-        # 🔑 AUTO LOGIN (FIRST TIME)
+        # 🔑 AUTO LOGIN
         user = conn.execute(
             "SELECT id, username, role FROM users WHERE email = ?",
             (email,)
@@ -203,23 +219,15 @@ def signup():
     return render_template("signup.html")
 
 
-
-
-
+# ---------------- LOGIN ----------------
 @app.route("/login", methods=["POST"])
 def login():
-    # RESET TEMP BUS ASSIGNMENTS
-    restore_expired_temp_bus_and_pickups()
-
-    
-
     user_input = request.form["login_user"]
     password = request.form["login_password"]
-    selected_role = request.form.get("role")
+    role = request.form.get("role")
 
     conn = get_db_connection()
 
-    # 1️⃣ Check if user exists
     user = conn.execute("""
         SELECT id, username, password, role
         FROM users
@@ -228,34 +236,27 @@ def login():
 
     if not user:
         conn.close()
-        flash("❌ Account does not exist. Please sign up.")
-        return redirect(url_for("index"))  # stay on login
+        flash("Account does not exist")
+        return redirect(url_for("index"))
 
-    # 2️⃣ Password check
     if user["password"] != password:
         conn.close()
-        flash("❌ Incorrect password.")
-        return redirect(url_for("index"))  # stay on login
+        flash("Incorrect password")
+        return redirect(url_for("index"))
 
-    # 3️⃣ Role check
-    if selected_role != user["role"]:
+    if role != user["role"]:
         conn.close()
-        flash("❌ Incorrect role selected.")
-        return redirect(url_for("index"))  # stay on login
+        flash("Incorrect role selected")
+        return redirect(url_for("index"))
 
     conn.close()
 
-    # 4️⃣ Successful login
     session.clear()
     session["user_id"] = user["id"]
     session["username"] = user["username"]
     session["role"] = user["role"]
 
-    if user["role"] == "admin":
-        return redirect(url_for("admin_dashboard"))
-    
-    else:
-        return redirect(url_for("dashboard"))
+    return redirect(url_for("dashboard"))
 
 
 
@@ -289,6 +290,17 @@ def my_bus():
     """, (user_id,)).fetchone()
 
     bus = None
+    # 🔁 RESET TEMP BUS IF EXPIRED (AUTO REASSIGN)
+    if user and user["temp_bus_id"] and user["temp_bus_date"] != today:
+        conn.execute("""
+          UPDATE users
+         SET temp_bus_id = NULL,
+             temp_bus_date = NULL
+         WHERE id = ?
+        """, (user_id,))
+    conn.commit()
+
+
 
     if user:
         # 🔹 TEMP BUS HAS PRIORITY (ONE DAY)
@@ -386,10 +398,14 @@ def driver_update_location():
     lat = data.get("latitude")
     lng = data.get("longitude")
 
+    if lat is None or lng is None:
+        return jsonify({"error": "invalid data"}), 400
+
     conn = get_db_connection()
 
+    # 🔹 Get driver's bus
     bus = conn.execute(
-        "SELECT bus_id FROM users WHERE id=?",
+        "SELECT bus_id FROM users WHERE id = ?",
         (session["user_id"],)
     ).fetchone()
 
@@ -397,6 +413,9 @@ def driver_update_location():
         conn.close()
         return jsonify({"error": "no bus assigned"}), 400
 
+    bus_id = bus["bus_id"]
+
+    # 🔹 Save / update bus GPS (EXISTING FEATURE — UNCHANGED)
     conn.execute("""
         INSERT INTO bus_location (bus_id, latitude, longitude, updated_at)
         VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -404,11 +423,52 @@ def driver_update_location():
             latitude = excluded.latitude,
             longitude = excluded.longitude,
             updated_at = CURRENT_TIMESTAMP
-    """, (bus["bus_id"], lat, lng))
+    """, (bus_id, lat, lng))
 
     conn.commit()
-    conn.close()
 
+    # ======================================================
+    # 🔔 NEW: NOTIFICATION TRIGGER (ADDED ONLY)
+    # ======================================================
+
+    students = conn.execute("""
+        SELECT u.id, p.latitude, p.longitude
+        FROM users u
+        JOIN pickup_points p ON p.user_id = u.id
+        WHERE u.bus_id = ?
+    """, (bus_id,)).fetchall()
+
+    for s in students:
+
+        # 🚌 Distance to pickup
+        d_pickup = haversine(
+            lat, lng,
+            s["latitude"], s["longitude"]
+        )
+
+        if d_pickup <= 500:
+            send_notification(
+                s["id"],
+                "near_pickup",
+                "🚌 Bus is near your pickup point"
+            )
+
+        # 🏫 Distance to college
+        d_college = haversine(
+            lat, lng,
+            COLLEGE_LAT, COLLEGE_LNG
+        )
+
+        if d_college <= 150:
+            send_notification(
+                s["id"],
+                "college_reached",
+                "🏫 Bus has reached the college"
+            )
+
+    # ======================================================
+
+    conn.close()
     return jsonify({"status": "ok"})
 
 
@@ -1896,8 +1956,6 @@ def assign_temp_bus(bus_id):
 
 
 
-# ================= STUDENT NEARBY BUSES (UPDATED) =================
-# ================= STUDENT NEARBY BUSES =================
 
 
 # ================= STUDENT ASSIGN TEMP BUS (ONE DAY) =================
@@ -2272,6 +2330,132 @@ def admin_messages():
     """, (session["user_id"],)).fetchall()
 
     return jsonify([dict(m) for m in msgs])
+
+# ================= ADMIN DELETE COMPLAINT =================
+@app.route("/admin/delete_complaint/<int:complaint_id>", methods=["POST"])
+def delete_complaint(complaint_id):
+    # 🔐 Only admin can delete
+    if session.get("role") != "admin":
+        return "Unauthorized", 403
+
+    conn = get_db_connection()
+
+    # 🗑️ Delete complaint
+    conn.execute(
+        "DELETE FROM complaints WHERE id = ?",
+        (complaint_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    flash("Complaint deleted successfully")
+    return redirect(url_for("admin_complaints"))
+def send_notification(user_id, notif_type, message):
+    conn = get_db_connection()
+
+    # 🚫 prevent duplicate notification
+    exists = conn.execute("""
+        SELECT 1 FROM notifications
+        WHERE user_id = ? AND type = ?
+    """, (user_id, notif_type)).fetchone()
+
+    if not exists:
+        conn.execute("""
+            INSERT INTO notifications (user_id, type, message)
+            VALUES (?, ?, ?)
+        """, (user_id, notif_type, message))
+        conn.commit()
+
+    conn.close()
+# ================= STUDENT NOTIFICATIONS PAGE =================
+@app.route("/student/notifications")
+def student_notifications():
+    if session.get("role") != "student":
+        return redirect(url_for("dashboard"))
+
+    conn = get_db_connection()
+    notes = conn.execute("""
+        SELECT message, created_at, is_read
+        FROM notifications
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    """, (session["user_id"],)).fetchall()
+    conn.close()
+
+    return render_template(
+        "student_notifications.html",
+        notifications=notes
+    )
+# ================= MARK STUDENT NOTIFICATIONS AS READ =================
+@app.route("/student/notifications/read")
+def mark_notifications_read():
+    if session.get("role") != "student":
+        return redirect(url_for("dashboard"))
+
+    conn = get_db_connection()
+    conn.execute("""
+        UPDATE notifications
+        SET is_read = 1
+        WHERE user_id = ?
+    """, (session["user_id"],))
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("student_notifications"))
+
+# ================= STUDENT DASHBOARD STATUS =================
+@app.route("/student/dashboard_status")
+def student_dashboard_status():
+
+    if session.get("role") != "student":
+        return jsonify({})
+
+    conn = get_db_connection()
+
+    # get pickup
+    pickup = conn.execute("""
+        SELECT latitude, longitude, bus_id
+        FROM pickup_points
+        WHERE user_id = ?
+    """, (session["user_id"],)).fetchone()
+
+    if not pickup:
+        conn.close()
+        return jsonify({})
+
+    # get latest bus location
+    bus = conn.execute("""
+        SELECT latitude, longitude
+        FROM bus_location
+        WHERE bus_id = ?
+        ORDER BY updated_at DESC
+        LIMIT 1
+    """, (pickup["bus_id"],)).fetchone()
+
+    if not bus:
+        conn.close()
+        return jsonify({})
+
+    d_pickup = haversine(
+        bus["latitude"], bus["longitude"],
+        pickup["latitude"], pickup["longitude"]
+    )
+
+    conn.close()
+
+    # 🔔 logic
+    if d_pickup <= 500 and d_pickup > 150:
+        return jsonify({
+            "show": True,
+            "message": "🚌 Bus is near your pickup point. Please be ready."
+        })
+
+    # ❌ crossed / reached pickup → hide message
+    return jsonify({"show": False})
+
+# ================= RESET TEMP BUS IF EXPIRED =================
+
 
 # ================= APP RUN =================
 if __name__ == "__main__":

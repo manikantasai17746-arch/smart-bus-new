@@ -1,61 +1,164 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Admin - Student Complaints</title>
-    <style>
-        body {
-            background:#0f2027;
-            color:white;
-            font-family: Arial, sans-serif;
-            padding:20px;
-        }
-        .card {
-            background:#1e293b;
-            padding:15px;
-            border-radius:10px;
-            margin-bottom:15px;
-        }
-        .subject {
-            font-size:18px;
-            color:#38bdf8;
-            font-weight:bold;
-        }
-        .meta {
-            font-size:13px;
-            color:#cbd5e1;
-        }
-        .message {
-            margin-top:10px;
-            background:#020617;
-            padding:10px;
-            border-radius:8px;
-        }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
 
-<h2>📢 Student Complaints</h2>
+{% block title %}Admin - Student Complaints{% endblock %}
 
-{% if complaints %}
-    {% for c in complaints %}
-        <div class="card">
-            <div class="subject">{{ c.subject }}</div>
-            <div class="meta">
-                👤 {{ c.username }} | 📧 {{ c.email }} <br>
-                🕒 {{ c.created_at }}
+{% block content %}
+
+<style>
+/* ===== PAGE ===== */
+.container {
+    max-width: 1000px;
+    margin: auto;
+    padding: 30px;
+}
+
+/* ===== HEADER ===== */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 28px;
+    background: linear-gradient(90deg, #38bdf8, #22c55e);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
+/* ===== COMPLAINT CARD ===== */
+.complaint-card {
+    position: relative;
+    background: linear-gradient(145deg, #020617, #0f172a);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 22px;
+    border-left: 4px solid #38bdf8;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.complaint-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+/* ===== CARD HEADER ===== */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #e5e7eb;
+}
+
+/* ===== META ===== */
+.meta {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #94a3b8;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* ===== STATUS BADGE ===== */
+.badge {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge.new {
+    background: #22c55e;
+    color: #020617;
+}
+
+/* ===== MESSAGE ===== */
+.message {
+    margin-top: 16px;
+    background: radial-gradient(circle at top left, #020617, #000);
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #e5e7eb;
+}
+
+/* ===== DELETE ===== */
+.delete-btn {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.delete-btn:hover {
+    opacity: 0.9;
+}
+
+/* ===== EMPTY ===== */
+.empty {
+    text-align: center;
+    color: #94a3b8;
+    padding: 60px;
+    font-size: 16px;
+}
+</style>
+
+<div class="container">
+
+    <div class="header">
+        <h1>📢 Student Complaints</h1>
+        <a href="{{ url_for('admin_dashboard') }}" style="color:#38bdf8;">← Dashboard</a>
+    </div>
+
+    {% if complaints %}
+        {% for c in complaints %}
+
+        <div class="complaint-card">
+
+            <div class="card-header">
+                <div>
+                    <h3>{{ c.subject }}</h3>
+                    <div class="meta">
+                        👤 {{ c.username }}
+                        📧 {{ c.email }}
+                        🕒 {{ c.created_at }}
+                        <span class="badge new">NEW</span>
+                    </div>
+                </div>
+
+                <!-- DELETE BUTTON (UNCHANGED, AS YOU REQUESTED) -->
+                <form method="POST"
+                      action="{{ url_for('delete_complaint', complaint_id=c.id) }}"
+                      onsubmit="return confirm('Delete this complaint permanently?');">
+                    <button class="delete-btn">Delete</button>
+                </form>
             </div>
+
             <div class="message">
                 {{ c.message }}
             </div>
+
         </div>
-        
-    {% endfor %}
-{% else %}
-    <p>No complaints submitted yet.</p>
-{% endif %}
 
-<a href="{{ url_for('admin_dashboard') }}" style="color:#38bdf8;">⬅ Back to Dashboard</a>
+        {% endfor %}
+    {% else %}
+        <div class="empty">
+            No complaints submitted yet.
+        </div>
+    {% endif %}
 
-</body>
-</html>
+</div>
+
+{% endblock %}

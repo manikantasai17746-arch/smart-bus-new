@@ -262,3 +262,12 @@ body {
     text-align: center;
   }
 }
+/* ===== FORCE VALIDATION COLORS ===== */
+.form-container input.error {
+  border: 2px solid red !important;
+}
+
+.form-container input.success {
+  border: 2px solid #22c55e !important;
+}
+

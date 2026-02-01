@@ -200,6 +200,9 @@ setTimeout(() => {
 let driverMarker = null;
 let pickupMarker = null;
 let routingControl = null;
+let pickupMarkersDrawn = false;
+let destinationMarker = null;
+
 
 let pickupLat = null;
 let pickupLng = null;
@@ -242,6 +245,7 @@ const destinationIcon = L.icon({
     iconAnchor: [12, 41],
     popupAnchor: [1, -34]
 });
+
 
 /* ---------------- HELPERS ---------------- */
 function distanceMeters(lat1, lon1, lat2, lon2) {
@@ -324,9 +328,10 @@ function loadLocation() {
 
             updateDistance(d.latitude, d.longitude);
             // 🔁 REDRAW ROUTE ON EVERY GPS UPDATE
-if (pickupLat !== null && driverReady) {
+if (pickupLat !== null && driverReady && !routingControl) {
     drawRoute();
 }
+
 
 
             
@@ -363,29 +368,25 @@ function moveMarkerSmooth(marker, newLatLng, duration = 1000) {
 /* ---------------- ROUTE (ONCE) ---------------- */
 /* ---------------- ROUTE (ONCE) ---------------- */
 function drawRoute() {
-    if (!driverReady || !driverMarker) return;
-
-    // 🔥 ERASE OLD ROUTE
-    if (routingControl) {
-        map.removeControl(routingControl);
-        routingControl = null;
-    }
+    if (!driverReady || !driverMarker || routingControl) return;
 
     fetch("/route_data/{{ bus.id }}")
         .then(r => r.json())
         .then(data => {
 
-            const d = driverMarker.getLatLng();
+            if (!data.destination?.lat || !data.destination?.lng) {
+                console.error("Destination missing");
+                return;
+            }
 
+            const d = driverMarker.getLatLng();
             let waypoints = [L.latLng(d.lat, d.lng)];
 
-            // 📍 Draw pickup markers ONCE
             if (!pickupMarkersDrawn) {
                 data.pickups.forEach(p => {
                     L.marker([p.lat, p.lng], { icon: pickupIcon })
                         .addTo(map)
                         .bindPopup("Pickup: " + p.name);
-
                     waypoints.push(L.latLng(p.lat, p.lng));
                 });
                 pickupMarkersDrawn = true;
@@ -396,27 +397,43 @@ function drawRoute() {
             }
 
             // 🏁 Destination marker ONCE
-            if (!destinationMarker) {
-                destinationMarker = L.marker(
-                    [data.destination.lat, data.destination.lng],
-                    { icon: destinationIcon }
-                )
-                .addTo(map)
-                .bindPopup("🏁 Destination");
+if (!destinationMarker) {
+    destinationMarker = L.marker(
+        [data.destination.lat, data.destination.lng],
+        { icon: destinationIcon }
+    )
+    .addTo(map)
+    .bindPopup("🏁 Destination");
 
-                destinationMarker.setZIndexOffset(900);
-            }
+    destinationMarker.setZIndexOffset(900);
+}
+
+// 🔥 FORCE RED ICON (IMPORTANT)
+destinationMarker.setIcon(destinationIcon);
+
 
             waypoints.push(
                 L.latLng(data.destination.lat, data.destination.lng)
             );
 
             routingControl = L.Routing.control({
-                waypoints: waypoints,
-                addWaypoints: false,
-                draggableWaypoints: false,
-                show: false
-            }).addTo(map);
+    waypoints: waypoints,
+    addWaypoints: false,
+    draggableWaypoints: false,
+    routeWhileDragging: false,
+    show: false,
+
+    lineOptions: {
+        styles: [
+            {
+                color: "#2563eb",   // 🔵 blue (Tailwind blue-600)
+                weight: 6,
+                opacity: 0.9
+            }
+        ]
+    }
+}).addTo(map);
+
         });
 }
 

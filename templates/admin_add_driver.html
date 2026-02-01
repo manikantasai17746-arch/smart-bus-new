@@ -1,61 +1,209 @@
 {% extends "base.html" %}
-{% block title %}Add Bus{% endblock %}
+{% block title %}Add Driver{% endblock %}
 
 {% block content %}
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 
-<div class="glass-page">
+<style>
+/* ===== PAGE ===== */
+.glass-page {
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px;
+}
 
+.glass-card {
+    width: 100%;
+    max-width: 520px;
+    background: linear-gradient(145deg, #020617, #0f172a);
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.45);
+    border: 1px solid #1e293b;
+}
+
+/* ===== HEADER ===== */
+.glass-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.icon-circle {
+    width: 64px;
+    height: 64px;
+    margin: auto;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #22c55e, #38bdf8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #020617;
+    font-size: 30px;
+    margin-bottom: 12px;
+}
+
+.glass-header h1 {
+    margin: 0;
+    font-size: 24px;
+    background: linear-gradient(90deg, #38bdf8, #22c55e);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
+.glass-header p {
+    color: #94a3b8;
+    font-size: 14px;
+    margin-top: 6px;
+}
+
+/* ===== SECTIONS ===== */
+.glass-section {
+    background: #020617;
+    padding: 16px;
+    border-radius: 14px;
+    margin-bottom: 18px;
+    border: 1px solid #1e293b;
+}
+
+.section-title {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    margin-bottom: 12px;
+}
+
+.section-title.green { color: #22c55e; }
+.section-title.blue  { color: #38bdf8; }
+
+/* ===== INPUTS ===== */
+input, select {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #e5e7eb;
+    padding: 12px 14px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+input::placeholder {
+    color: #64748b;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #38bdf8;
+}
+
+/* ===== BUTTON ===== */
+.neon-btn {
+    width: 100%;
+    margin-top: 10px;
+    background: linear-gradient(135deg, #22c55e, #38bdf8);
+    border: none;
+    padding: 14px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #020617;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.neon-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(34,197,94,0.35);
+}
+/* ===== ASSIGN BUS UI ===== */
+.assign-bus {
+    position: relative;
+}
+
+.bus-select-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.bus-icon {
+    font-size: 28px;
+    color: #38bdf8;
+}
+
+.assign-bus select {
+    flex: 1;
+    appearance: none;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #e5e7eb;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    cursor: pointer;
+}
+.assign-bus select:focus {
+    border-color: #38bdf8;
+}
+</style>
+
+<div class="glass-page">
   <div class="glass-card">
 
     <div class="glass-header">
-    <div class="icon-circle">
-    <span class="material-symbols-outlined">person_add</span>
-</div>
-
-
-      <h1>Add New DRIVER</h1>
-      <p>Register a driver and assign BUS details</p>
+      <div class="icon-circle">
+        <span class="material-symbols-outlined">person_add</span>
+      </div>
+      <h1>Add New Driver</h1>
+      <p>Create driver account and assign bus</p>
     </div>
 
     <form method="POST">
 
-  <!-- DRIVER DETAILS -->
-  <div class="glass-section">
-    <span class="section-title green">DRIVER DETAILS</span>
-    <input type="text" name="driver_name" placeholder="Full Name" required>
-    <input type="text" name="phone" placeholder="Driver Phone" required>
+      <!-- DRIVER DETAILS -->
+      <div class="glass-section">
+        <span class="section-title green">DRIVER DETAILS</span>
+        <input type="text" name="driver_name" placeholder="Full Name" required>
+        <input type="text" name="phone" placeholder="Driver Phone Number" required>
+      </div>
 
-  </div>
-  
+      <!-- LOGIN CREDENTIALS -->
+      <div class="glass-section">
+        <span class="section-title blue">LOGIN CREDENTIALS</span>
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="email" name="email" placeholder="Login Email" required>
+        <input type="password" name="password" placeholder="Password" required>
+      </div>
 
+      <!-- ASSIGN BUS -->
+      <!-- ASSIGN BUS -->
+<div class="glass-section assign-bus">
+  <span class="section-title">ASSIGN BUS</span>
 
-  <!-- LOGIN CREDENTIALS -->
-  <div class="glass-section">
-    <span class="section-title blue">LOGIN CREDENTIALS</span>
-    <input type="text" name="username" placeholder="Username" required>
-    <input type="email" name="email" placeholder="Login Email" required>
-    <input type="password" name="password" placeholder="Password" required>
-  </div>
+  <div class="bus-select-wrapper">
+    <span class="material-symbols-outlined bus-icon">directions_bus</span>
 
-  <!-- ASSIGN BUS -->
-  <div class="glass-section">
-    <span class="section-title">ASSIGN BUS</span>
     <select name="bus_id" required>
+      <option value="" disabled selected>
+        Select a bus and route
+      </option>
       {% for bus in buses %}
         <option value="{{ bus.id }}">
-          {{ bus.bus_number }} - {{ bus.route }}
+          🚌 {{ bus.bus_number }} | {{ bus.route }}
         </option>
       {% endfor %}
     </select>
   </div>
+</div>
 
-  <button type="submit" class="neon-btn">
-    Create Driver Account
-  </button>
 
-</form>
+      <button type="submit" class="neon-btn">
+        Create Driver Account
+      </button>
 
+    </form>
 
   </div>
 </div>
