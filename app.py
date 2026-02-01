@@ -1738,9 +1738,10 @@ def student_pickup_order():
 
     conn = get_db_connection()
 
-    student = conn.execute("""
-        SELECT id, bus_id FROM users WHERE id=?
-    """, (session["user_id"],)).fetchone()
+    student = conn.execute(
+        "SELECT id, bus_id FROM users WHERE id=?",
+        (session["user_id"],)
+    ).fetchone()
 
     if not student or not student["bus_id"]:
         conn.close()
@@ -1748,43 +1749,57 @@ def student_pickup_order():
 
     bus_id = student["bus_id"]
 
-    bus = conn.execute("""
-        SELECT latitude, longitude
-        FROM bus_location
-        WHERE bus_id=?
-    """, (bus_id,)).fetchone()
+    bus = conn.execute(
+        "SELECT latitude, longitude FROM bus_location WHERE bus_id=?",
+        (bus_id,)
+    ).fetchone()
 
     driver_started = bus is not None
 
     students = conn.execute("""
-        SELECT
-            p.user_id,
-            p.pickup_name,
-            p.latitude,
-            p.longitude
-        FROM pickup_points p
-        WHERE p.bus_id=?
+        SELECT user_id, pickup_name, latitude, longitude
+        FROM pickup_points
+        WHERE bus_id=?
     """, (bus_id,)).fetchall()
 
     pickups = []
 
+    # ✅ THIS LOOP MUST BE INSIDE THE FUNCTION
     for s in students:
 
         if not bus:
             d = 999999
             status = "Pending"
+
         else:
             d = haversine(
                 bus["latitude"], bus["longitude"],
                 s["latitude"], s["longitude"]
             )
 
-            if d <= 150:
+            # 🔒 LOCK STATUS
+            row = conn.execute(
+                "SELECT status FROM pickup_points WHERE user_id=? AND bus_id=?",
+                (s["user_id"], bus_id)
+            ).fetchone()
+
+            current_status = row["status"] if row else "Pending"
+
+            if current_status == "Reached":
                 status = "Reached"
-            elif d <= 500:
-                status = "Approaching"
             else:
-                status = "Pending"
+                if d <= 150:
+                    status = "Reached"
+                elif d <= 500:
+                    status = "Approaching"
+                else:
+                    status = "Pending"
+
+                if status != current_status:
+                    conn.execute(
+                        "UPDATE pickup_points SET status=? WHERE user_id=? AND bus_id=?",
+                        (status, s["user_id"], bus_id)
+                    )
 
         pickups.append({
             "name": s["pickup_name"],
@@ -1793,21 +1808,11 @@ def student_pickup_order():
             "is_me": s["user_id"] == student["id"]
         })
 
-    pickups.sort(key=lambda x: x["distance"])
-
-    college_reached = False
-    if bus:
-        college_dist = haversine(
-            bus["latitude"], bus["longitude"],
-            COLLEGE_LAT, COLLEGE_LNG
-        )
-        college_reached = college_dist <= 200
-
+    conn.commit()
     conn.close()
 
     return jsonify({
         "driver_started": driver_started,
-        "college_reached": college_reached,
         "pickups": pickups
     })
 
